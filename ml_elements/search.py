@@ -1,62 +1,80 @@
 """
 search.py
 ---------
-Trial generators for hyperparameter search.
+Trial generators for **model hyperparameter search**.
 
-All three classes share the same interface: call ``.trials(dgp_fn)`` and
-get back a ``list[Trial]`` that can be passed directly to ``Study.run()``.
+Scope — read this first
+-----------------------
+These generators are for *optimizing a model* (``learning_rate``, ``depth``,
+regularization, …): knobs that have a single best value you want to find.
+
+They are **not** the tool for varying the *experiment* itself — class balance
+(``p_pos``), feature signal strength (``info``), label noise, and the like.
+Those are design knobs you *sweep* on a grid to map a response curve; there is
+no "best" value to search for. Use ``ScenarioSweep`` (``sweep.py``) for them.
+See ``sweep.py`` for the full distinction. If you need both, nest a
+hyperparameter search inside each scenario.
+
+All classes share the same interface: call ``.trials(dgp_fn)`` and get back a
+``list[Trial]`` that can be passed directly to ``Study.run()``.
 
 Classes
 -------
 SobolSearch
     Quasi-random low-discrepancy sequences (scipy Sobol). Better coverage
     than uniform random for the same number of points. Ideal for 2–10
-    continuous parameters.
+    continuous hyperparameters.
 
 RandomSearch
     Independent uniform random sampling. Simple and reproducible.
 
 ManualSearch
-    Explicit list of parameter dicts. Use when you already know the points
-    you want to evaluate (grid search, hand-crafted ablations, etc.).
+    Explicit list of parameter dicts — full control over the points
+    evaluated. General-purpose; for pure DGP scenario sweeps prefer the
+    clearer ``ScenarioSweep``.
 
 Interface
 ---------
-All three accept:
-    - ``dgp_fn(params) -> DGP``   required — wires sampled params to a DGP
+All accept:
+    - ``dgp_fn(params) -> DGP``   required — wires the fixed scenario to a DGP
     - ``model_fn(params) -> ModelBackend | None``  optional — per-trial model
     - ``seed_offset``  base offset for trial seeds
 
-The caller is in full control of which parameters flow into the DGP vs the
-model factory, because they write the lambda/function.
+The caller controls which parameters flow into the DGP vs the model factory,
+because they write the lambda/function.
 
 Examples
 --------
-Sobol search over (p_pos, x3_info, learning_rate):
+Sobol search over model hyperparameters, with the scenario held fixed:
 
     search = SobolSearch(
-        param_space={"p_pos": (0.02, 0.5), "x3_info": (0.0, 1.5), "lr": (0.01, 0.3)},
+        param_space={"lr": (0.01, 0.3), "max_leaf_nodes": (8, 64)},
         n_points=32,
         seed=0,
     )
     trials = search.trials(
+        # scenario is fixed — only the model varies
         dgp_fn=lambda p: GaussianBinaryDGP(
-            p_pos=p["p_pos"],
-            info={"x1": 0.85, "x2": 0.55, "x3": p["x3_info"]},
+            p_pos=0.15,
+            info={"x1": 0.85, "x2": 0.55, "x3": 0.35},
         ),
-        model_fn=lambda p: make_hgb(learning_rate=p["lr"]),
+        model_fn=lambda p: make_hgb(
+            learning_rate=p["lr"],
+            max_leaf_nodes=int(p["max_leaf_nodes"]),
+        ),
     )
     result = study.run(trials)
 
-Manual ablation — three explicit points:
+Manual ablation — three explicit hyperparameter points:
 
     search = ManualSearch([
-        {"label_noise": 0.0},
-        {"label_noise": 0.05},
-        {"label_noise": 0.10},
+        {"lr": 0.01},
+        {"lr": 0.06},
+        {"lr": 0.20},
     ])
     trials = search.trials(
-        dgp_fn=lambda p: ShiftedDGP(base_dgp, lambda df: inject_noise(df, p["label_noise"])),
+        dgp_fn=lambda p: base_dgp,
+        model_fn=lambda p: make_hgb(learning_rate=p["lr"]),
     )
 """
 
@@ -114,8 +132,11 @@ class SobolSearch:
 
     Examples
     --------
-    >>> search = SobolSearch({"p_pos": (0.02, 0.5), "lr": (0.01, 0.3)}, n_points=16)
-    >>> trials = search.trials(dgp_fn=lambda p: GaussianBinaryDGP(p_pos=p["p_pos"], ...))
+    >>> search = SobolSearch({"lr": (0.01, 0.3), "depth": (3, 8)}, n_points=16)
+    >>> trials = search.trials(
+    ...     dgp_fn=lambda p: fixed_dgp,
+    ...     model_fn=lambda p: make_catboost(learning_rate=p["lr"], depth=int(p["depth"])),
+    ... )
     """
 
     def __init__(
@@ -280,8 +301,16 @@ class ManualSearch:
     """
     Explicit list of parameter dicts — full user control.
 
-    Use for grid search, hand-crafted ablations, or any case where you
+    Use for hand-crafted hyperparameter ablations, or any case where you
     know exactly which points you want to evaluate.
+
+    Note
+    ----
+    If the parameters you are listing are DGP *scenario* knobs (``p_pos``,
+    ``info``, label noise, …) rather than model hyperparameters, prefer
+    ``ScenarioSweep`` — it carries the same mechanics but names the intent
+    correctly (you are sweeping an experiment axis, not searching for a best
+    value).
 
     Parameters
     ----------
@@ -293,10 +322,13 @@ class ManualSearch:
     Examples
     --------
     >>> search = ManualSearch(
-    ...     [{"p_pos": 0.05}, {"p_pos": 0.10}, {"p_pos": 0.25}],
-    ...     trial_name="p_pos",
+    ...     [{"lr": 0.01}, {"lr": 0.06}, {"lr": 0.20}],
+    ...     trial_name="lr",
     ... )
-    >>> trials = search.trials(dgp_fn=lambda p: GaussianBinaryDGP(p_pos=p["p_pos"], ...))
+    >>> trials = search.trials(
+    ...     dgp_fn=lambda p: fixed_dgp,
+    ...     model_fn=lambda p: make_hgb(learning_rate=p["lr"]),
+    ... )
     """
 
     def __init__(

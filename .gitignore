@@ -1,0 +1,4 @@
+__pycache__/
+*.pyc
+artifacts_info_studies/
+.ipynb_checkpoints/

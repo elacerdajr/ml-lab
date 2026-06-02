@@ -1,7 +1,7 @@
 """
 protocols.py
 ------------
-Structural interfaces for the ml_exp building blocks.
+Structural interfaces for the ml_elements building blocks.
 
 All blocks depend only on these protocols — never on each other's concrete
 classes. This means any piece can be swapped without touching anything else.

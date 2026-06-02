@@ -1,4 +1,4 @@
-# ml_exp — ML Experiment Blocks
+# ml_elements — ML Experiment Blocks
 
 Composable building blocks for binary classification experiments. Each block does one thing and connects to the others through clean interfaces — swap any piece without touching the rest.
 
@@ -18,23 +18,30 @@ pip install numpy pandas scikit-learn matplotlib scipy
 | `TrialResult` | Everything from one trial — fitted models, data splits, per-repeat scores |
 | `Study` | Runs a list of trials, aggregates results, computes improvements |
 | `StudyResult` | Full output: all `TrialResult`s + combined scores DataFrame |
-| `SobolSearch` | Generates trials from a quasi-random Sobol grid |
-| `RandomSearch` | Generates trials from uniform random sampling |
+| `ScenarioSweep` | **Sweeps** DGP design knobs (`p_pos`, `info`, …) on a grid |
+| `SobolSearch` | **Searches** model hyperparameters via a quasi-random Sobol grid |
+| `RandomSearch` | Searches model hyperparameters via uniform random sampling |
 | `ManualSearch` | Generates trials from an explicit list of parameter dicts |
-| `Comparator` | Statistical comparison using bootstrap AP distributions |
+| `Comparator` | Statistical comparison using paired bootstrap AP distributions |
+
+> **Sweep vs. search — they are not the same thing.** `p_pos` and `info` are
+> *experiment design* choices: you sweep them on a grid (`ScenarioSweep`) to map
+> a response curve — there is no "best" value to find. `learning_rate`, `depth`,
+> etc. are *model hyperparameters*: you search them (`SobolSearch`) for the single
+> best model within a fixed scenario. Don't put `p_pos`/`info` in a search space.
 
 ---
 
 ## Quick start
 
 ```python
-from ml_exp import (
+from ml_elements import (
     GaussianBinaryDGP,
     make_logistic,
     AUC, AVG_PRECISION,
     DataBudget, Trial,
     TrialRunner, Study,
-    ManualSearch,
+    ScenarioSweep,
     plot_study,
 )
 
@@ -60,13 +67,10 @@ runner = TrialRunner(
 )
 study = Study(runner, primary_metric=AUC)
 
-# 4. Define what to vary
-trials = ManualSearch(
-    [{"p_pos": p} for p in [0.02, 0.05, 0.10, 0.25, 0.50]],
-    trial_name="p_pos",
-).trials(
-    dgp_fn=lambda p: GaussianBinaryDGP(
-        p_pos=p["p_pos"],
+# 4. Sweep the design knob you want to study (here: class balance)
+trials = ScenarioSweep.over("p_pos", [0.02, 0.05, 0.10, 0.25, 0.50]).trials(
+    dgp_fn=lambda s: GaussianBinaryDGP(
+        p_pos=s["p_pos"],
         info={"x1": 0.85, "x2": 0.55, "x3": 0.15},
     )
 )
@@ -99,32 +103,42 @@ model.coef_
 
 ## Sobol hyperparameter search
 
+Search **model** knobs only — keep the scenario (`p_pos`, `info`) fixed:
+
 ```python
-from ml_exp import SobolSearch, make_hgb
+from ml_elements import SobolSearch, make_hgb
 
 search = SobolSearch(
-    param_space={"p_pos": (0.02, 0.5), "x3_info": (0.0, 1.5), "lr": (0.01, 0.3)},
+    param_space={"lr": (0.01, 0.3), "max_leaf_nodes": (8, 64)},
     n_points=32,
     seed=0,
 )
 
 trials = search.trials(
+    # scenario is fixed — only the model varies
     dgp_fn=lambda p: GaussianBinaryDGP(
-        p_pos=p["p_pos"],
-        info={"x1": 0.85, "x2": 0.55, "x3": p["x3_info"]},
+        p_pos=0.15,
+        info={"x1": 0.85, "x2": 0.55, "x3": 0.35},
     ),
-    model_fn=lambda p: make_hgb(learning_rate=p["lr"]),
+    model_fn=lambda p: make_hgb(
+        learning_rate=p["lr"],
+        max_leaf_nodes=int(p["max_leaf_nodes"]),
+    ),
 )
 
 result = study.run(trials)
 ```
+
+> To study how the *scenario* affects results (e.g. how the value of `x3`
+> changes with `p_pos`), sweep it with `ScenarioSweep` instead — that gives a
+> clean curve. If you need both, nest a `SobolSearch` inside each scenario.
 
 ---
 
 ## Swap model — zero other changes
 
 ```python
-from ml_exp import make_hgb, make_catboost
+from ml_elements import make_hgb, make_catboost
 
 # HGB
 runner_hgb = TrialRunner(setups=setups, model_factory=make_hgb(), metrics=[AUC], budget=budget)
@@ -138,7 +152,7 @@ runner_cat = TrialRunner(setups=setups, model_factory=make_catboost(depth=6), me
 ## Swap DGP to real data — same runner
 
 ```python
-from ml_exp import RealDataDGP
+from ml_elements import RealDataDGP
 
 real_dgp   = RealDataDGP(df=df_historical, target_col="click")
 real_trial = Trial(name="real", value=0.0, dgp=real_dgp, seed_offset=0)
@@ -151,7 +165,7 @@ result = study.run([real_trial])
 ## Add label noise / covariate shift
 
 ```python
-from ml_exp import ShiftedDGP
+from ml_elements import ShiftedDGP
 
 noisy = ShiftedDGP(
     base=GaussianBinaryDGP(p_pos=0.15, info={"x1": 0.85, "x2": 0.55}),
@@ -174,7 +188,7 @@ Requires `pip install joblib`.
 ## Statistical comparison
 
 ```python
-from ml_exp import Comparator
+from ml_elements import Comparator
 
 cmp = Comparator(n_boot=3_000)
 
@@ -193,7 +207,7 @@ bac.pairwise_report()
 ## Plots
 
 ```python
-from ml_exp import (
+from ml_elements import (
     plot_study,
     plot_calibration,
     plot_feature_importance,
@@ -222,7 +236,7 @@ plot_search_heatmap(result, param_x="p_pos", param_y="x3_info", summary=sobol_su
 ## Custom metric
 
 ```python
-from ml_exp import Metric
+from ml_elements import Metric
 from sklearn.metrics import f1_score
 
 F1 = Metric(
@@ -239,7 +253,7 @@ runner = TrialRunner(..., metrics=[AUC, F1], ...)
 ## File layout
 
 ```
-ml_exp/
+ml_elements/
 ├── protocols.py   DGP, ModelBackend, MetricFn — structural interfaces
 ├── dgp.py         GaussianBinaryDGP, RealDataDGP, ShiftedDGP
 ├── models.py      make_logistic, make_hgb, make_catboost, make_sklearn
@@ -247,8 +261,9 @@ ml_exp/
 ├── trial.py       DataBudget, Trial
 ├── runner.py      TrialRunner, TrialResult
 ├── study.py       Study, StudyResult
-├── search.py      SobolSearch, RandomSearch, ManualSearch
-├── analysis.py    Comparator (wraps BayesianAPComparator)
+├── sweep.py       ScenarioSweep — sweep DGP design knobs (p_pos, info)
+├── search.py      SobolSearch, RandomSearch, ManualSearch — model hyperparameters
+├── analysis.py    Comparator, APComparison (paired bootstrap on real predictions)
 └── plots.py       plot_study, plot_calibration, plot_feature_importance,
                    plot_search_heatmap, plot_score_distributions
 ```

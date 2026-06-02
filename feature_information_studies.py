@@ -1,4 +1,3 @@
-
 """
 feature_information_studies.py
 
@@ -11,11 +10,8 @@ Setup:
     setup_1 = {x1, x2}
     setup_2 = {x1, x2, x3}
 
-    improvement = score(setup_2) - score(setup_1)
-
-For logloss:
-
-    improvement = logloss(setup_1) - logloss(setup_2)
+    improvement = score(setup_2) - score(setup_1)     (higher-is-better metrics)
+    improvement = score(setup_1) - score(setup_2)     (logloss)
 
 So:
 
@@ -26,44 +22,32 @@ Two studies
 -----------
 
 Study A: class-balance sensitivity
-
-    keep information fixed
-    vary positive fraction
-
-    I(x1), I(x2), I(x3) = constant
-    p_pos varies
+    keep information fixed, vary the positive fraction p_pos.
 
 Study B: new-feature information sensitivity
+    keep the positive fraction fixed, vary the information in x3.
 
-    keep positive fraction fixed
-    vary information in x3
-
-    p_pos = constant
-    I(x1), I(x2) = constant
-    I(x3) varies
+Both are *scenario sweeps*: p_pos and the info levels are experiment-design
+choices, not knobs to optimize. We sweep them on a grid (``ScenarioSweep``)
+to map the improvement curve — there is no "best" p_pos to search for.
 
 
-Simple information proxy
-------------------------
+Implementation
+--------------
+This script is a thin driver over the ``ml_elements`` package — it owns no DGP,
+model, or evaluation logic of its own. The building blocks are:
 
-For this Gaussian experiment:
-
-    x_j | y=0 ~ Normal(0, sigma)
-    x_j | y=1 ~ Normal(separation_j, sigma)
-
-Information proxy:
-
-    info_j = separation_j = |mu_1j - mu_0j| / sigma
-
-Higher info_j means less overlap between classes.
-
-This is not literal mutual information, but it is a clean signal-strength knob.
+    GaussianBinaryDGP   the data-generating process
+    TrialRunner/Study   fit per setup, score on repeated fresh test draws
+    ScenarioSweep       generate one trial per scenario on the grid
+    plot_study          render the improvement curve
 
 
 Install
 -------
 
-    pip install numpy pandas scikit-learn matplotlib catboost rich
+    pip install numpy pandas scikit-learn matplotlib scipy
+    # optional: catboost (catboost backend), rich (progress bars), joblib (n_jobs)
 
 Run
 ---
@@ -74,8 +58,12 @@ Outputs
 -------
 
     artifacts_info_studies/
-        study_A_results.csv
-        study_B_results.csv
+        study_A_raw_scores.csv
+        study_A_improvements.csv
+        study_A_summary.csv
+        study_B_raw_scores.csv
+        study_B_improvements.csv
+        study_B_summary.csv
         study_A_positive_fraction.png
         study_B_x3_information.png
         config_snapshot.json
@@ -85,15 +73,24 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Dict, List, Optional, Literal
+from typing import Callable
 
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
-
-from sklearn.linear_model import LogisticRegression
-from sklearn.ensemble import HistGradientBoostingClassifier
-from sklearn.metrics import roc_auc_score, average_precision_score, log_loss
+from ml_elements import (
+    AUC,
+    AVG_PRECISION,
+    LOGLOSS,
+    DataBudget,
+    GaussianBinaryDGP,
+    Metric,
+    ScenarioSweep,
+    Study,
+    StudyResult,
+    TrialRunner,
+    make_catboost,
+    make_hgb,
+    make_logistic,
+    plot_study,
+)
 
 
 # =============================================================================
@@ -105,14 +102,11 @@ CONFIG = {
 
     "target_col": "y",
 
-    # Choose:
-    #   "auc"
-    #   "average_precision"
-    #   "logloss"
+    # Choose: "auc" | "average_precision" | "logloss"
     "primary_metric": "auc",
 
     "model": {
-        # "logistic" is very fast and matches the Gaussian/log-odds structure.
+        # "logistic" is fast and matches the Gaussian/log-odds structure.
         # "hgb" is a lightweight sklearn tree booster.
         # "catboost" uses CatBoostClassifier (all numeric features here).
         "backend": "logistic",
@@ -143,10 +137,7 @@ CONFIG = {
     },
 
     "test_sampling": {
-        # Fresh test worlds:
-        #
-        #   D_test_r ~ P_true(X, y)
-        #
+        # Fresh test worlds per repeat: D_test_r ~ P_true(X, y).
         # Training data is fixed per condition.
         "n_repeats": 20,
     },
@@ -156,616 +147,177 @@ CONFIG = {
         "setup_2_x1_x2_x3": ["x1", "x2", "x3"],
     },
 
-    # Study A:
-    #   p_pos varies
-    #   info levels fixed
+    # Study A: p_pos varies, info levels fixed.
     "study_A_positive_fraction": {
         "p_pos_grid": [0.02, 0.05, 0.10, 0.15, 0.25, 0.40, 0.50],
         "sigma": 1.0,
-        "fixed_info": {
-            "x1": 0.85,
-            "x2": 0.55,
-            "x3": 0.35,
-        },
+        "fixed_info": {"x1": 0.85, "x2": 0.55, "x3": 0.35},
     },
 
-    # Study B:
-    #   p_pos fixed
-    #   info_x3 varies
+    # Study B: p_pos fixed, info_x3 varies.
     "study_B_x3_information": {
         "p_pos": 0.15,
         "sigma": 1.0,
-        "fixed_info": {
-            "x1": 0.85,
-            "x2": 0.55,
-        },
+        "fixed_info": {"x1": 0.85, "x2": 0.55},
         "x3_info_grid": [0.0, 0.10, 0.20, 0.35, 0.50, 0.75, 1.00, 1.25],
     },
 }
 
 
-METRIC_DIRECTION = {
-    "auc": "higher",
-    "average_precision": "higher",
-    "logloss": "lower",
+_METRICS: dict[str, Metric] = {
+    "auc": AUC,
+    "average_precision": AVG_PRECISION,
+    "logloss": LOGLOSS,
 }
 
 
 # =============================================================================
-# 1. Data generator
+# 1. Wiring helpers — translate CONFIG into ml_elements building blocks
 # =============================================================================
 
-class GaussianBinaryDGP:
-    """
-    DGP = data-generating process.
+def build_model_factory(model_cfg: dict) -> Callable:
+    """Map the ``model`` config block to a zero-arg model factory."""
+    backend = model_cfg["backend"]
+    rs = model_cfg["random_state"]
 
-    Simple notation:
-
-        y ~ Bernoulli(p)
-
-        x_j | y=0 ~ N(0, sigma)
-        x_j | y=1 ~ N(info_j * sigma, sigma)
-
-    Since:
-
-        info_j = |mu_1j - mu_0j| / sigma
-
-    we can control information by changing info_j.
-    """
-
-    def __init__(
-        self,
-        p_pos: float,
-        info: Dict[str, float],
-        sigma: float = 1.0,
-    ):
-        self.p_pos = p_pos
-        self.info = info
-        self.sigma = sigma
-
-    def sample(self, n: int, seed: int) -> pd.DataFrame:
-        rng = np.random.default_rng(seed)
-
-        y = rng.binomial(n=1, p=self.p_pos, size=n)
-        df = pd.DataFrame({"y": y})
-
-        for feature, info_j in self.info.items():
-            mu0 = 0.0
-            mu1 = info_j * self.sigma
-            mu = np.where(y == 1, mu1, mu0)
-
-            df[feature] = rng.normal(loc=mu, scale=self.sigma, size=n)
-
-        return df
-
-
-# =============================================================================
-# 2. Model factory
-# =============================================================================
-
-class ModelFactory:
-    """
-    The model is kept constant across setup_1 and setup_2.
-
-    Only feature set changes:
-
-        setup_1 = {x1, x2}
-        setup_2 = {x1, x2, x3}
-    """
-
-    def __init__(self, config: Dict):
-        self.config = config
-
-    def create(self):
-        backend = self.config["backend"]
-
-        if backend == "logistic":
-            return LogisticRegression(
-                max_iter=300,
-                solver="lbfgs",
-                random_state=self.config["random_state"],
-            )
-
-        if backend == "hgb":
-            return HistGradientBoostingClassifier(
-                max_iter=self.config["iterations"],
-                learning_rate=self.config["learning_rate"],
-                max_leaf_nodes=self.config["max_leaf_nodes"],
-                random_state=self.config["random_state"],
-                validation_fraction=None,
-                early_stopping=False,
-            )
-
-        if backend == "catboost":
-            try:
-                from catboost import CatBoostClassifier
-            except ImportError as exc:
-                raise ImportError(
-                    "CatBoost backend requires catboost. Install with: pip install catboost"
-                ) from exc
-
-            return CatBoostClassifier(
-                iterations=self.config["iterations"],
-                learning_rate=self.config["learning_rate"],
-                depth=self.config["depth"],
-                random_seed=self.config["random_state"],
-                loss_function="Logloss",
-                verbose=False,
-                allow_writing_files=False,
-            )
-
-        raise ValueError(f"Unknown model backend: {backend}")
-
-
-# =============================================================================
-# 3. Evaluation engine
-# =============================================================================
-
-class SetupComparator:
-    """
-    Fixed train/valid within one condition.
-
-    Repeated true test sampling:
-
-        D_train fixed
-        D_valid fixed
-        D_test_r ~ P_true(X, y)
-
-    For each condition c and repeat r:
-
-        score_1(c, r) = score(model({x1,x2}), D_test_r)
-        score_2(c, r) = score(model({x1,x2,x3}), D_test_r)
-
-        improvement(c, r) = score_2(c, r) - score_1(c, r)
-
-    For lower-is-better metrics:
-
-        improvement(c, r) = score_1(c, r) - score_2(c, r)
-    """
-
-    def __init__(
-        self,
-        setups: Dict[str, List[str]],
-        target_col: str,
-        primary_metric: str,
-        model_factory: ModelFactory,
-    ):
-        if primary_metric not in METRIC_DIRECTION:
-            raise ValueError(f"Unknown metric: {primary_metric}")
-
-        self.setups = setups
-        self.target_col = target_col
-        self.primary_metric = primary_metric
-        self.model_factory = model_factory
-
-    def _score_all(self, y_true: np.ndarray, p_hat: np.ndarray) -> Dict[str, float]:
-        p_hat = np.clip(p_hat, 1e-8, 1 - 1e-8)
-
-        return {
-            "auc": roc_auc_score(y_true, p_hat),
-            "average_precision": average_precision_score(y_true, p_hat),
-            "logloss": log_loss(y_true, p_hat),
-        }
-
-    def fit_models(
-        self,
-        df_train: pd.DataFrame,
-        df_valid: pd.DataFrame,
-    ) -> Dict[str, object]:
-        models = {}
-
-        for setup_name, features in self.setups.items():
-            X_train = df_train[features]
-            y_train = df_train[self.target_col]
-
-            # df_valid is kept fixed for future extension:
-            # early stopping, calibration, threshold selection, etc.
-            _ = df_valid
-
-            model = self.model_factory.create()
-            model.fit(X_train, y_train)
-
-            models[setup_name] = model
-
-        return models
-
-    def evaluate_once(
-        self,
-        models: Dict[str, object],
-        df_test: pd.DataFrame,
-        condition_name: str,
-        condition_value: float,
-        repeat: int,
-        seed: int,
-    ) -> pd.DataFrame:
-        y_test = df_test[self.target_col]
-        rows = []
-
-        for setup_name, features in self.setups.items():
-            model = models[setup_name]
-            p_hat = model.predict_proba(df_test[features])[:, 1]
-            scores = self._score_all(y_test, p_hat)
-
-            rows.append({
-                "condition_name": condition_name,
-                "condition_value": condition_value,
-                "repeat": repeat,
-                "test_seed": seed,
-                "setup": setup_name,
-                "features": ",".join(features),
-                **scores,
-            })
-
-        return pd.DataFrame(rows)
-
-    def add_improvement_column(self, raw_results: pd.DataFrame) -> pd.DataFrame:
-        metric = self.primary_metric
-        direction = METRIC_DIRECTION[metric]
-
-        setup_names = list(self.setups.keys())
-        baseline = setup_names[0]
-        challenger = setup_names[1]
-
-        key_cols = ["condition_name", "condition_value", "repeat"]
-
-        wide = raw_results.pivot_table(
-            index=key_cols,
-            columns="setup",
-            values=metric,
-        ).reset_index()
-
-        raw_delta = wide[challenger] - wide[baseline]
-
-        if direction == "higher":
-            improvement = raw_delta
-        else:
-            improvement = -raw_delta
-
-        wide["baseline"] = baseline
-        wide["challenger"] = challenger
-        wide["metric"] = metric
-        wide["raw_delta_challenger_minus_baseline"] = raw_delta
-        wide["improvement"] = improvement
-
-        return wide
-
-    def summarize(self, improvement_results: pd.DataFrame) -> pd.DataFrame:
-        return (
-            improvement_results
-            .groupby(["condition_name", "condition_value"])
-            .agg(
-                mean_improvement=("improvement", "mean"),
-                std_improvement=("improvement", "std"),
-                p_improvement_gt_0=("improvement", lambda x: float((x > 0).mean())),
-                mean_baseline_score=(list(self.setups.keys())[0], "mean"),
-                mean_challenger_score=(list(self.setups.keys())[1], "mean"),
-                n_repeats=("improvement", "count"),
-            )
-            .reset_index()
+    if backend == "logistic":
+        return make_logistic(random_state=rs)
+    if backend == "hgb":
+        return make_hgb(
+            iterations=model_cfg["iterations"],
+            learning_rate=model_cfg["learning_rate"],
+            max_leaf_nodes=model_cfg["max_leaf_nodes"],
+            random_state=rs,
         )
+    if backend == "catboost":
+        return make_catboost(
+            iterations=model_cfg["iterations"],
+            learning_rate=model_cfg["learning_rate"],
+            depth=model_cfg["depth"],
+            random_state=rs,
+        )
+    raise ValueError(f"Unknown model backend: {backend}")
+
+
+def build_budget(config: dict) -> DataBudget:
+    """Map the sample-size / seed / repeat config into a DataBudget."""
+    return DataBudget(
+        n_train=config["sample_sizes"]["train"],
+        n_valid=config["sample_sizes"]["valid"],
+        n_test=config["sample_sizes"]["test"],
+        seed_train=config["seeds"]["train"],
+        seed_valid=config["seeds"]["valid"],
+        seed_test_base=config["seeds"]["test_base"],
+        n_repeats=config["test_sampling"]["n_repeats"],
+    )
 
 
 # =============================================================================
-# 4. Study runner
+# 2. Study runner
 # =============================================================================
 
 class InformationStudyRunner:
     """
-    Runs both studies.
+    Runs both scenario sweeps on top of a single shared ``Study``.
 
-    Study A:
-
-        variable = p_pos
-        fixed info = {info_x1, info_x2, info_x3}
-
-    Study B:
-
-        fixed p_pos
-        variable = info_x3
-        fixed info_x1, info_x2
+    Study A:  sweep p_pos, hold the info levels fixed.
+    Study B:  sweep info_x3, hold p_pos and info_x1/x2 fixed.
     """
 
-    def __init__(self, config: Dict):
+    def __init__(self, config: dict):
         self.config = config
         self.output_dir = Path(config["output_dir"])
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
-        self.comparator = SetupComparator(
-            setups=config["setups"],
+        if config["primary_metric"] not in _METRICS:
+            raise ValueError(f"Unknown primary_metric: {config['primary_metric']}")
+        self.primary_metric = _METRICS[config["primary_metric"]]
+
+        self.setups = config["setups"]
+        self.baseline, self.challenger = list(self.setups.keys())[:2]
+
+        runner = TrialRunner(
+            setups=self.setups,
+            model_factory=build_model_factory(config["model"]),
+            metrics=[AUC, AVG_PRECISION, LOGLOSS],
+            budget=build_budget(config),
             target_col=config["target_col"],
-            primary_metric=config["primary_metric"],
-            model_factory=ModelFactory(config["model"]),
+        )
+        self.study = Study(runner, primary_metric=self.primary_metric)
+
+    def _finalize(self, result: StudyResult, prefix: str):
+        """Compute improvements + summary, persist CSVs, return (improved, summary)."""
+        improved = self.study.improvements(
+            result, baseline=self.baseline, challenger=self.challenger
+        )
+        summary = self.study.summarize(improved)
+
+        result.scores.to_csv(self.output_dir / f"{prefix}_raw_scores.csv", index=False)
+        improved.to_csv(self.output_dir / f"{prefix}_improvements.csv", index=False)
+        summary.to_csv(self.output_dir / f"{prefix}_summary.csv", index=False)
+
+        return improved, summary
+
+    def run_study_A_positive_fraction(self):
+        cfg = self.config["study_A_positive_fraction"]
+        fixed_info = cfg["fixed_info"]
+        sigma = cfg["sigma"]
+
+        trials = ScenarioSweep.over("p_pos", cfg["p_pos_grid"]).trials(
+            dgp_fn=lambda s: GaussianBinaryDGP(
+                p_pos=s["p_pos"],
+                info=fixed_info,
+                sigma=sigma,
+            ),
+            seed_offset=10_000,
         )
 
-    def _run_condition(
-        self,
-        dgp: GaussianBinaryDGP,
-        condition_name: str,
-        condition_value: float,
-        condition_seed_offset: int,
-    ) -> pd.DataFrame:
-        n_train = self.config["sample_sizes"]["train"]
-        n_valid = self.config["sample_sizes"]["valid"]
-        n_test = self.config["sample_sizes"]["test"]
+        result = self.study.run(trials)
+        return self._finalize(result, "study_A")
 
-        train_seed = self.config["seeds"]["train"] + condition_seed_offset
-        valid_seed = self.config["seeds"]["valid"] + condition_seed_offset
-
-        df_train = dgp.sample(n_train, train_seed)
-        df_valid = dgp.sample(n_valid, valid_seed)
-
-        models = self.comparator.fit_models(df_train, df_valid)
-
-        parts = []
-
-        for repeat in range(1, self.config["test_sampling"]["n_repeats"] + 1):
-            test_seed = (
-                self.config["seeds"]["test_base"]
-                + condition_seed_offset * 1000
-                + repeat
-            )
-
-            df_test = dgp.sample(n_test, test_seed)
-
-            parts.append(
-                self.comparator.evaluate_once(
-                    models=models,
-                    df_test=df_test,
-                    condition_name=condition_name,
-                    condition_value=condition_value,
-                    repeat=repeat,
-                    seed=test_seed,
-                )
-            )
-
-        return pd.concat(parts, ignore_index=True)
-
-    def run_study_A_positive_fraction(self) -> tuple[pd.DataFrame, pd.DataFrame]:
-        cfg = self.config["study_A_positive_fraction"]
-        p_pos_grid = cfg["p_pos_grid"]
-        n_train = self.config["sample_sizes"]["train"]
-        n_repeats = self.config["test_sampling"]["n_repeats"]
-        metric = self.config["primary_metric"]
-        backend = self.config["model"]["backend"]
-        fixed_info = cfg["fixed_info"]
-
-        try:
-            from rich.console import Console
-            from rich.panel import Panel
-            from rich.progress import (
-                BarColumn,
-                MofNCompleteColumn,
-                Progress,
-                SpinnerColumn,
-                TextColumn,
-                TimeElapsedColumn,
-            )
-            from rich.table import Table
-            from rich.text import Text
-
-            console = Console()
-            use_rich = True
-        except ImportError:
-            console = None
-            use_rich = False
-
-        if use_rich:
-            console.print(
-                Panel(
-                    "\n".join(
-                        [
-                            f"[bold]metric[/bold]       {metric}",
-                            f"[bold]model[/bold]        {backend}",
-                            f"[bold]train[/bold]        {n_train:,}",
-                            f"[bold]valid[/bold]        {self.config['sample_sizes']['valid']:,}",
-                            f"[bold]test[/bold]         {self.config['sample_sizes']['test']:,}",
-                            f"[bold]repeats[/bold]      {n_repeats} per condition",
-                            f"[bold]conditions[/bold]   {len(p_pos_grid)} p_pos values",
-                            (
-                                "[bold]info[/bold]         "
-                                f"x1={fixed_info['x1']}, "
-                                f"x2={fixed_info['x2']}, "
-                                f"x3={fixed_info['x3']}"
-                            ),
-                        ]
-                    ),
-                    title="Study A · positive fraction sweep",
-                    border_style="cyan",
-                )
-            )
-        else:
-            print(
-                f"Study A: {len(p_pos_grid)} conditions, "
-                f"metric={metric}, model={backend}, train={n_train:,}"
-            )
-
-        parts = []
-
-        def run_grid(progress=None, task_id=None) -> None:
-            for i, p_pos in enumerate(p_pos_grid):
-                expected_pos = n_train * p_pos
-
-                if progress is not None and task_id is not None:
-                    progress.update(
-                        task_id,
-                        description=(
-                            f"p_pos={p_pos:.4g}  "
-                            f"E[pos]≈{expected_pos:.0f}"
-                        ),
-                    )
-
-                dgp = GaussianBinaryDGP(
-                    p_pos=p_pos,
-                    info=fixed_info,
-                    sigma=cfg["sigma"],
-                )
-
-                part = self._run_condition(
-                    dgp=dgp,
-                    condition_name="p_pos",
-                    condition_value=p_pos,
-                    condition_seed_offset=10_000 + i,
-                )
-                parts.append(part)
-
-                if use_rich:
-                    improved_part = self.comparator.add_improvement_column(part)
-                    mean_imp = improved_part["improvement"].mean()
-                    p_win = (improved_part["improvement"] > 0).mean()
-                    style = "green" if mean_imp > 0 else "red" if mean_imp < 0 else "yellow"
-                    console.print(
-                        f"  [{style}]Δ {metric}[/] = {mean_imp:+.5f}  "
-                        f"[dim]P(improvement>0)={p_win:.0%}[/dim]"
-                    )
-                else:
-                    print(f"  p_pos={p_pos:.4g} done")
-
-                if progress is not None and task_id is not None:
-                    progress.advance(task_id)
-
-        if use_rich:
-            with Progress(
-                SpinnerColumn(),
-                TextColumn("[progress.description]{task.description}"),
-                BarColumn(),
-                MofNCompleteColumn(),
-                TimeElapsedColumn(),
-                console=console,
-            ) as progress:
-                task_id = progress.add_task("conditions", total=len(p_pos_grid))
-                run_grid(progress=progress, task_id=task_id)
-        else:
-            run_grid()
-
-        raw = pd.concat(parts, ignore_index=True)
-        improved = self.comparator.add_improvement_column(raw)
-        summary = self.comparator.summarize(improved)
-
-        raw.to_csv(self.output_dir / "study_A_raw_scores.csv", index=False)
-        improved.to_csv(self.output_dir / "study_A_improvements.csv", index=False)
-        summary.to_csv(self.output_dir / "study_A_summary.csv", index=False)
-
-        if use_rich:
-            table = Table(
-                title="Study A summary",
-                show_header=True,
-                header_style="bold magenta",
-            )
-            table.add_column("p_pos", justify="right")
-            table.add_column(f"Δ {metric}", justify="right")
-            table.add_column("± std", justify="right")
-            table.add_column("P(Δ>0)", justify="right")
-            table.add_column("baseline", justify="right")
-            table.add_column("+x3", justify="right")
-
-            for _, row in summary.iterrows():
-                imp = row["mean_improvement"]
-                style = "green" if imp > 0 else "red" if imp < 0 else ""
-                table.add_row(
-                    f"{row['condition_value']:.4g}",
-                    Text(f"{imp:+.5f}", style=style),
-                    f"{row['std_improvement']:.5f}",
-                    f"{row['p_improvement_gt_0']:.0%}",
-                    f"{row['mean_baseline_score']:.5f}",
-                    f"{row['mean_challenger_score']:.5f}",
-                )
-
-            console.print(table)
-            console.print(
-                f"[dim]Saved[/dim] study_A_raw_scores.csv, "
-                f"study_A_improvements.csv, study_A_summary.csv "
-                f"[dim]→[/dim] {self.output_dir}"
-            )
-
-        return improved, summary
-
-    def run_study_B_x3_information(self) -> tuple[pd.DataFrame, pd.DataFrame]:
+    def run_study_B_x3_information(self):
         cfg = self.config["study_B_x3_information"]
+        base_info = cfg["fixed_info"]
+        p_pos = cfg["p_pos"]
+        sigma = cfg["sigma"]
 
-        parts = []
+        trials = ScenarioSweep.over("x3_info", cfg["x3_info_grid"]).trials(
+            dgp_fn=lambda s: GaussianBinaryDGP(
+                p_pos=p_pos,
+                info={**base_info, "x3": s["x3_info"]},
+                sigma=sigma,
+            ),
+            seed_offset=20_000,
+        )
 
-        for i, x3_info in enumerate(cfg["x3_info_grid"]):
-            info = {
-                "x1": cfg["fixed_info"]["x1"],
-                "x2": cfg["fixed_info"]["x2"],
-                "x3": x3_info,
-            }
-
-            dgp = GaussianBinaryDGP(
-                p_pos=cfg["p_pos"],
-                info=info,
-                sigma=cfg["sigma"],
-            )
-
-            parts.append(
-                self._run_condition(
-                    dgp=dgp,
-                    condition_name="x3_info",
-                    condition_value=x3_info,
-                    condition_seed_offset=20_000 + i,
-                )
-            )
-
-        raw = pd.concat(parts, ignore_index=True)
-        improved = self.comparator.add_improvement_column(raw)
-        summary = self.comparator.summarize(improved)
-
-        raw.to_csv(self.output_dir / "study_B_raw_scores.csv", index=False)
-        improved.to_csv(self.output_dir / "study_B_improvements.csv", index=False)
-        summary.to_csv(self.output_dir / "study_B_summary.csv", index=False)
-
-        return improved, summary
+        result = self.study.run(trials)
+        return self._finalize(result, "study_B")
 
     def save_config(self) -> None:
         with open(self.output_dir / "config_snapshot.json", "w") as f:
             json.dump(self.config, f, indent=2)
 
-    def plot_study_summary(
-        self,
-        summary: pd.DataFrame,
-        x_col: str,
-        title: str,
-        filename: str,
-    ) -> None:
-        fig, ax = plt.subplots(figsize=(9, 5))
-
-        x = summary["condition_value"].values
-        y = summary["mean_improvement"].values
-        err = summary["std_improvement"].fillna(0).values
-
-        ax.axhline(0, linewidth=2, alpha=0.35)
-        ax.plot(x, y, marker="o", linewidth=3)
-        ax.fill_between(x, y - err, y + err, alpha=0.18)
-
-        ax.set_title(title)
-        ax.set_xlabel(x_col)
-        ax.set_ylabel(f"Mean improvement in {self.config['primary_metric'].upper()}")
-        ax.grid(True, linewidth=2, alpha=0.1)
-        ax.spines[["top", "right"]].set_visible(False)
-
-        fig.tight_layout()
-        fig.savefig(self.output_dir / filename, dpi=160)
-        plt.close(fig)
-
     def run_all(self) -> None:
         self.save_config()
 
-        study_A_improvements, study_A_summary = self.run_study_A_positive_fraction()
-        study_B_improvements, study_B_summary = self.run_study_B_x3_information()
+        _, study_A_summary = self.run_study_A_positive_fraction()
+        _, study_B_summary = self.run_study_B_x3_information()
 
-        self.plot_study_summary(
-            summary=study_A_summary,
-            x_col="positive fraction p_pos",
+        fig_a = plot_study(
+            study_A_summary,
+            metric=self.primary_metric,
             title="Study A: fixed feature information, varying positive fraction",
-            filename="study_A_positive_fraction.png",
+            x_label="positive fraction p_pos",
         )
+        fig_a.savefig(self.output_dir / "study_A_positive_fraction.png", dpi=160)
 
-        self.plot_study_summary(
-            summary=study_B_summary,
-            x_col="x3 information level",
+        fig_b = plot_study(
+            study_B_summary,
+            metric=self.primary_metric,
             title="Study B: fixed positive fraction, varying x3 information",
-            filename="study_B_x3_information.png",
+            x_label="x3 information level",
         )
+        fig_b.savefig(self.output_dir / "study_B_x3_information.png", dpi=160)
 
         print("\nStudy A summary:")
         print(study_A_summary.round(5).to_string(index=False))

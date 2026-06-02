@@ -1,28 +1,37 @@
 """
-ml_exp
-------
+ml_elements
+-----------
 Composable building blocks for ML experiments.
 
 Quick start
 -----------
 Import everything in one line:
 
-    from ml_exp import *
+    from ml_elements import *
 
 Or import specific blocks:
 
-    from ml_exp import (
+    from ml_elements import (
         GaussianBinaryDGP, RealDataDGP, ShiftedDGP,
         make_logistic, make_hgb, make_catboost, make_sklearn,
         AUC, LOGLOSS, AVG_PRECISION, AVG_PRECISION_SMOOTH, Metric, make_smooth_ap,
         DataBudget, Trial,
         TrialRunner, TrialResult,
         Study, StudyResult,
-        SobolSearch, RandomSearch, ManualSearch,
-        Comparator,
+        ScenarioSweep,                       # sweep experiment design knobs
+        SobolSearch, RandomSearch, ManualSearch,  # search model hyperparameters
+        Comparator, APComparison,
         plot_study, plot_calibration, plot_feature_importance,
         plot_search_heatmap, plot_score_distributions,
     )
+
+Two kinds of knob — keep them separate
+---------------------------------------
+ScenarioSweep    *Sweep* DGP design knobs (p_pos, info, ...). You vary the
+                 experiment to map a response curve; there is no "best" value.
+SobolSearch /    *Search* model hyperparameters (learning_rate, depth, ...)
+RandomSearch     to find the single best model within a fixed scenario.
+See ``sweep.py`` for the full distinction.
 
 Vocabulary
 ----------
@@ -31,10 +40,11 @@ Trial            One experimental condition (DGP + condition label + optional ov
 TrialResult      Output of one trial: fitted models, train/val data, per-repeat scores
 Study            Runs a list of trials, aggregates results, computes improvements
 StudyResult      Full output of Study.run(): all TrialResults + combined scores DataFrame
-SobolSearch      Generates trials from a Sobol quasi-random parameter grid
-RandomSearch     Generates trials from uniform random sampling
+ScenarioSweep    Generates trials by sweeping DGP design knobs on a grid
+SobolSearch      Generates trials from a Sobol quasi-random hyperparameter grid
+RandomSearch     Generates trials from uniform random hyperparameter sampling
 ManualSearch     Generates trials from an explicit list of parameter dicts
-Comparator       Statistical comparison via BayesianAPComparator
+Comparator       Paired bootstrap AP comparison of setups (see APComparison)
 
 Typical flow
 ------------
@@ -48,12 +58,10 @@ Typical flow
                          metrics=[AUC, AVG_PRECISION], budget=budget)
     study  = Study(runner, primary_metric=AUC, n_jobs=1)
 
-    trials = ManualSearch(
-        [{"p_pos": p} for p in [0.02, 0.05, 0.10, 0.25, 0.50]],
-        trial_name="p_pos",
-    ).trials(
-        dgp_fn=lambda p: GaussianBinaryDGP(
-            p_pos=p["p_pos"],
+    # Sweep the class balance — a design choice, not something to optimize:
+    trials = ScenarioSweep.over("p_pos", [0.02, 0.05, 0.10, 0.25, 0.50]).trials(
+        dgp_fn=lambda s: GaussianBinaryDGP(
+            p_pos=s["p_pos"],
             info={"x1": 0.85, "x2": 0.55, "x3": 0.15},
         )
     )
@@ -70,7 +78,7 @@ Typical flow
     model.predict_proba(X_new)[:, 1]
 """
 
-from .analysis import Comparator
+from .analysis import APComparison, Comparator
 from .dgp import GaussianBinaryDGP, RealDataDGP, ShiftedDGP
 from .metrics import (
     ALL_METRICS,
@@ -93,6 +101,7 @@ from .protocols import DGP, MetricFn, ModelBackend
 from .runner import TrialResult, TrialRunner
 from .search import ManualSearch, RandomSearch, SobolSearch
 from .study import Study, StudyResult
+from .sweep import ScenarioSweep
 from .trial import DataBudget, Trial
 
 __all__ = [
@@ -126,12 +135,15 @@ __all__ = [
     # Study
     "Study",
     "StudyResult",
-    # Search
+    # Scenario sweeps (DGP design knobs)
+    "ScenarioSweep",
+    # Hyperparameter search (model knobs)
     "SobolSearch",
     "RandomSearch",
     "ManualSearch",
     # Analysis
     "Comparator",
+    "APComparison",
     # Plots
     "plot_study",
     "plot_calibration",

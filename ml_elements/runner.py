@@ -21,7 +21,7 @@ The models in ``TrialResult.models`` are fully accessible after the run:
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Callable
 
 import pandas as pd
@@ -51,6 +51,12 @@ class TrialResult:
     scores : pd.DataFrame
         One row per (setup, repeat). Columns include all computed metrics,
         ``repeat``, ``test_seed``, ``setup``, ``trial_name``, ``trial_value``.
+    budget : DataBudget
+        The effective data budget used for this trial (after any per-trial
+        override). Records the test sizes and seeds, so downstream analysis
+        can reproduce the exact test draws used here.
+    target_col : str
+        Name of the label column produced by the DGP.
     """
 
     trial: Trial
@@ -58,6 +64,8 @@ class TrialResult:
     df_train: pd.DataFrame
     df_valid: pd.DataFrame
     scores: pd.DataFrame
+    budget: DataBudget
+    target_col: str = "y"
 
 
 class TrialRunner:
@@ -161,6 +169,8 @@ class TrialRunner:
             df_train=df_train,
             df_valid=df_valid,
             scores=scores,
+            budget=budget,
+            target_col=self.target_col,
         )
 
     def _fit_models(
