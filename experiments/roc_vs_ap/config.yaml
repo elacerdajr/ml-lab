@@ -1,0 +1,65 @@
+# experiments/roc_vs_ap/config.yaml
+# ──────────────────────────────────
+# Shared settings: data budget, seeds, models, metrics.
+# Study-specific sweeps live in study_imbalance.yaml / study_feature_info.yaml.
+
+experiment:
+  name: roc_vs_ap
+  description: >
+    Compare HistGradientBoosting models whose early-stopping criterion is
+    ROC-AUC vs Average Precision across class-imbalance and feature-
+    information conditions (2 features: x1, x2).
+
+data:
+  n_train: 3000
+  n_test:  5000
+  n_repeats: 40          # independent test draws per condition
+  seeds:
+    train: 101
+    test_base: 10000
+
+dgp:
+  sigma: 1.0
+  # Base feature info (class separation / sigma).
+  # Studies may scale these via `info_scale`.
+  info:
+    x1: 0.8
+    x2: 0.5
+
+# ── Models ─────────────────────────────────────────────────────────────────
+# Both models use HistGradientBoosting with early stopping;
+# only the stopping criterion differs.
+models:
+  auc_model:
+    backend: hgb
+    label: "AUC-trained"
+    hgb:
+      max_iter: 500
+      learning_rate: 0.05
+      max_leaf_nodes: 15
+      early_stopping: true
+      scoring: roc_auc
+      validation_fraction: 0.15
+      n_iter_no_change: 20
+      random_state: 42
+
+  ap_model:
+    backend: hgb
+    label: "AP-trained"
+    hgb:
+      max_iter: 500
+      learning_rate: 0.05
+      max_leaf_nodes: 15
+      early_stopping: true
+      scoring: average_precision
+      validation_fraction: 0.15
+      n_iter_no_change: 20
+      random_state: 42
+
+# Metrics to compute on every test draw
+metrics:
+  - roc_auc
+  - average_precision
+
+outputs:
+  dir: outputs
