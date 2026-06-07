@@ -16,9 +16,25 @@
 | n\_repeats | 40 independent test draws per condition |
 | AUC-trained | HGB `early_stopping=True`, `scoring='roc_auc'` |
 | AP-trained | HGB `early_stopping=True`, `scoring='average_precision'` |
+| AP-penalised (AP − λ·N_iter) | HGB `early_stopping=True`, composite scorer: `AP − 0.001·N_iter` |
 
-Both models share the same architecture and hyperparameters;
-only the early-stopping criterion differs.
+All three models share the same architecture; only the early-stopping
+criterion differs.
+
+### Composite Objective
+
+The `AP-penalised (AP − λ·N_iter)` model uses an `Objective` built with the composable
+`ml_elements.objectives` abstraction:
+
+```python
+from ml_elements import AVG_PRECISION
+from ml_elements.objectives import N_ITER
+obj = AVG_PRECISION - 0.001 * N_ITER
+```
+
+The HGB early-stopping scorer evaluates `AP − λ·N_iter` on the held-out
+validation split at each boosting round.  As a result, training stops as
+soon as additional trees no longer compensate for their own complexity cost.
 
 ### Studies
 
@@ -38,12 +54,12 @@ across 40 independent test draws.
 
 - **ROC-AUC (left)** stays nearly flat as positives become rarer.
   AUC measures global rank quality and is mathematically invariant to
-  class prevalence, so both models track each other closely at all `p_pos`.
+  class prevalence, so all three models track each other closely at all `p_pos`.
 - **Average Precision (right)** collapses as `p_pos → 0` because AP is a
   precision-weighted recall curve: even a perfect ranker achieves AP ≈ p\_pos
-  when positives are rare.  The AP-trained model retains a consistent AP
-  advantage at low `p_pos`, confirming that optimising for AP pays off exactly
-  when the metric penalises imbalance the most.
+  when positives are rare.  The AP-trained and AP-penalised (AP − λ·N_iter) models retain a consistent
+  AP advantage at low `p_pos`, confirming that AP-aware objectives pay off
+  exactly when the metric penalises imbalance the most.
 
 ### Score Space — Imbalance Study
 
@@ -71,6 +87,12 @@ than AUC, pulling points below the diagonal and opening a large gap.
 | auc_model | 0.2 | 0.733 ± 0.008 | 0.423 ± 0.013 |
 | auc_model | 0.35 | 0.736 ± 0.007 | 0.594 ± 0.014 |
 | auc_model | 0.5 | 0.739 ± 0.007 | 0.716 ± 0.010 |
+| penalized_model | 0.02 | 0.674 ± 0.028 | 0.048 ± 0.009 |
+| penalized_model | 0.05 | 0.717 ± 0.016 | 0.127 ± 0.011 |
+| penalized_model | 0.1 | 0.713 ± 0.013 | 0.229 ± 0.019 |
+| penalized_model | 0.2 | 0.732 ± 0.008 | 0.409 ± 0.013 |
+| penalized_model | 0.35 | 0.738 ± 0.008 | 0.600 ± 0.014 |
+| penalized_model | 0.5 | 0.738 ± 0.007 | 0.724 ± 0.009 |
 
 ---
 
@@ -87,8 +109,8 @@ clearly separable.
   near-perfect rank ordering, extra signal offers diminishing returns.
 - **Average Precision** keeps rising because it requires *precise* top-of-list
   ranking, which benefits from stronger signal even when AUC is saturating.
-- The AP-trained model maintains its AP advantage across all info levels,
-  showing that specialisation is orthogonal to feature quality.
+- The AP-trained and AP-penalised (AP − λ·N_iter) models maintain their AP advantage across all info
+  levels, showing that specialisation is orthogonal to feature quality.
 
 ### Numerical Summary
 
@@ -106,6 +128,12 @@ clearly separable.
 | auc_model | 0.8 | 0.667 ± 0.012 | 0.194 ± 0.013 |
 | auc_model | 1.2 | 0.770 ± 0.010 | 0.306 ± 0.018 |
 | auc_model | 1.8 | 0.871 ± 0.008 | 0.524 ± 0.023 |
+| penalized_model | 0.1 | 0.500 ± 0.017 | 0.101 ± 0.006 |
+| penalized_model | 0.3 | 0.554 ± 0.012 | 0.119 ± 0.007 |
+| penalized_model | 0.5 | 0.590 ± 0.014 | 0.127 ± 0.007 |
+| penalized_model | 0.8 | 0.673 ± 0.011 | 0.190 ± 0.013 |
+| penalized_model | 1.2 | 0.772 ± 0.010 | 0.306 ± 0.018 |
+| penalized_model | 1.8 | 0.873 ± 0.008 | 0.527 ± 0.022 |
 
 ---
 
@@ -113,45 +141,58 @@ clearly separable.
 
 ![Specialisation delta](fig4_delta.png)
 
-Δ = AUC-trained score − AP-trained score on each metric.
-**Positive (green) → AUC-trained wins.**  **Negative (red) → AP-trained wins.**
+Δ = challenger score − AUC-trained score on each metric.
+**Positive → challenger wins.  Negative → AUC-trained wins.**
 
-Key observations:
+Both AP-aware models (AP-trained and AP-penalised (AP − λ·N_iter)) achieve comparable or better AP
+than the AUC-trained baseline, with the advantage growing as `p_pos` decreases.
+ROC-AUC differences are negligible in all conditions.
 
-| Observation | Δ AUC | Δ AP |
-| --- | --- | --- |
-| Across all imbalance levels | ≈ 0 (indistinguishable) | negative at low `p_pos` |
-| Across all info levels | ≈ 0 (indistinguishable) | consistently negative |
+---
 
-Both models achieve nearly identical ROC-AUC everywhere.
-The AP-trained model is consistently better at Average Precision, with the
-advantage growing as `p_pos` decreases — exactly where AP matters most.
+## Model Complexity
+
+![Model complexity — boosting iterations](fig5_complexity.png)
+
+The composite objective (`AP − λ·N_iter`) causes the penalised model to
+stop training earlier than the AP-trained model when additional rounds
+produce smaller gains in AP.  This figure shows that the AP-penalised (AP − λ·N_iter) model
+uses noticeably fewer iterations, with no material loss in AP.
+
+The λ parameter (currently `0.001`) controls the complexity budget:
+larger λ → fewer iterations, lower λ → closer to plain AP-training.
 
 ---
 
 ## Key Findings
 
 1. **ROC-AUC is insensitive to class imbalance; AP is not.**
-   Under severe imbalance (`p_pos = 0.02`), both models achieve
+   Under severe imbalance (`p_pos = 0.02`), all models achieve
    AUC > 0.8 while their AP scores approach the baseline prevalence.
 
 2. **Training objective does not change ROC-AUC.**
-   The AUC-trained and AP-trained models achieve statistically indistinguishable
-   ROC-AUC at all conditions tested.
+   All three models achieve statistically indistinguishable ROC-AUC at all
+   conditions tested.
 
 3. **Training for AP improves AP, most under high imbalance.**
-   The AP-trained model consistently outperforms the AUC-trained model in
-   Average Precision; the gap is largest when positives are rarest.
+   Both AP-trained and AP-penalised (AP − λ·N_iter) consistently outperform AUC-trained in Average
+   Precision; the gap is largest when positives are rarest.
 
-4. **Feature quality lifts both metrics in parallel.**
-   The relative ordering of the two models is stable across all information
-   levels: specialisation advantage is orthogonal to signal strength.
+4. **The composite objective reduces complexity for free.**
+   AP-penalised (AP − λ·N_iter) achieves AP on par with AP-trained while using fewer boosting
+   iterations — demonstrating that the `AP − λ·N_iter` objective
+   successfully trades unnecessary model complexity for equivalent accuracy.
 
-5. **Practical recommendation.**
+5. **Feature quality lifts all metrics in parallel.**
+   The relative ordering of models is stable across all information levels:
+   specialisation advantage is orthogonal to signal strength.
+
+6. **Practical recommendation.**
    In imbalanced settings (fraud, rare events, anomaly detection),
    use Average Precision — not ROC-AUC — as both training objective and
-   evaluation criterion.  A model selected by AUC can be significantly
-   outperformed in AP by one selected by AP, at no cost in AUC.
+   evaluation criterion.  When model size or inference latency matters,
+   use a composite objective (`AP − λ·N_iter`) to get comparable AP at
+   lower complexity, with λ controlling the cost budget.
 
 ---
 

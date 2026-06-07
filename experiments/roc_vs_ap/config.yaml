@@ -56,6 +56,22 @@ models:
       n_iter_no_change: 20
       random_state: 42
 
+  penalized_model:
+    backend: hgb
+    label: "AP-penalised (AP − λ·N_iter)"
+    # Early-stopping criterion = AP - penalty_lambda * n_iter.
+    # The model stops when this composite score plateaus, favouring
+    # fewer iterations for equivalent AP.
+    penalty_lambda: 0.001
+    hgb:
+      max_iter: 500
+      learning_rate: 0.05
+      max_leaf_nodes: 15
+      early_stopping: true
+      validation_fraction: 0.15
+      n_iter_no_change: 20
+      random_state: 43
+
 # Metrics to compute on every test draw
 metrics:
   - roc_auc

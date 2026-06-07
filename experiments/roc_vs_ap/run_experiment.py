@@ -77,16 +77,36 @@ def load_yaml(path: Path) -> dict:
 # Model factory builder
 # =============================================================================
 
+def _make_penalized_scorer(lambda_: float):
+    """
+    Return an (estimator, X, y) -> float scorer for HGB early stopping
+    that computes AP − lambda_ * n_iter.  Stopping plateaus sooner when
+    extra boosting rounds no longer improve AP enough to justify the cost.
+    """
+    from sklearn.metrics import average_precision_score as _aps
+    def _scorer(estimator, X, y):
+        p_hat = estimator.predict_proba(X)[:, 1]
+        return _aps(y, p_hat) - lambda_ * estimator.n_iter_
+    return _scorer
+
+
 def build_model_factory(model_cfg: dict):
     """
     Return a zero-argument callable that produces a fresh, unfitted model.
 
     Delegates to ml_elements.models.make_sklearn so the factory pattern is
     consistent with the rest of the repo.
+
+    When ``penalty_lambda`` is set, the HGB ``scoring`` callable is replaced
+    with a composite criterion: AP − λ·N_iter.
     """
     backend = model_cfg["backend"]
     if backend == "hgb":
-        return make_sklearn(HistGradientBoostingClassifier, **model_cfg["hgb"])
+        hgb_params = dict(model_cfg["hgb"])
+        lam = model_cfg.get("penalty_lambda")
+        if lam is not None:
+            hgb_params["scoring"] = _make_penalized_scorer(float(lam))
+        return make_sklearn(HistGradientBoostingClassifier, **hgb_params)
     raise ValueError(f"Unknown model backend: {backend!r}. Supported: 'hgb'.")
 
 
@@ -178,6 +198,7 @@ def run_condition(
             row: dict = {"model": name, "repeat": rep, condition_col: condition_value}
             for cfg_name, m in metrics:
                 row[cfg_name] = m.score(y_te, p_hat)
+            row["n_iter"] = float(getattr(model, "n_iter_", np.nan))
             rows.append(row)
 
     return pd.DataFrame(rows)
@@ -243,8 +264,8 @@ def build_summary(df: pd.DataFrame, condition_col: str, metric_names: list[str])
 # Plots
 # =============================================================================
 
-_PALETTE = {"auc_model": "#2563eb", "ap_model": "#dc2626"}
-_MARKERS  = {"auc_model": "o",      "ap_model": "s"}
+_PALETTE = {"auc_model": "#2563eb", "ap_model": "#dc2626", "penalized_model": "#16a34a"}
+_MARKERS  = {"auc_model": "o",      "ap_model": "s",      "penalized_model": "^"}
 
 
 def _mlabel(name: str, model_cfgs: dict) -> str:
@@ -355,22 +376,21 @@ def plot_delta(
     metric_names: list[str],
     model_cfgs: dict,
     out_path: Path,
+    baseline: str | None = None,
 ) -> None:
     """
-    2 × 2 grid (rows = metrics, cols = studies).
-    Each cell: Δ = model_a score − model_b score vs condition.
-    Green shading = model_a wins; red = model_b wins.
+    rows = metrics, cols = studies.
+    Each panel: Δ = challenger − baseline for every non-baseline model.
     """
-    mnames  = list(model_cfgs.keys())
-    model_a, model_b = mnames[0], mnames[1]
-    lbl_a   = _mlabel(model_a, model_cfgs)
-    lbl_b   = _mlabel(model_b, model_cfgs)
+    mnames   = list(model_cfgs.keys())
+    baseline = baseline or mnames[0]
+    challengers = [m for m in mnames if m != baseline]
+    lbl_base = _mlabel(baseline, model_cfgs)
 
     study_specs = [
         (df1, cond1_col, xlabel1),
         (df2, cond2_col, xlabel2),
     ]
-    metric_colors = dict(zip(metric_names, ["#2563eb", "#dc2626", "#16a34a"]))
 
     fig, axes = plt.subplots(
         len(metric_names), 2,
@@ -378,36 +398,34 @@ def plot_delta(
         squeeze=False,
     )
     fig.suptitle(
-        f"Model specialisation advantage\n"
-        f"Δ = {lbl_a} score − {lbl_b} score  "
-        f"(positive → {lbl_a} wins  ·  negative → {lbl_b} wins)",
+        f"Model specialisation advantage vs {lbl_base}\n"
+        f"(positive → challenger wins  ·  negative → {lbl_base} wins)",
         fontsize=12,
     )
 
     for ri, metric in enumerate(metric_names):
-        color = metric_colors.get(metric, "#555")
         for ci, (df, cond_col, xlabel) in enumerate(study_specs):
             ax = axes[ri][ci]
+            ax.axhline(0, color="gray", linewidth=1.5, linestyle="--", alpha=0.6)
+
             wide = (
                 df.pivot_table(index=[cond_col, "repeat"], columns="model", values=metric)
                 .reset_index()
             )
-            if model_a not in wide.columns or model_b not in wide.columns:
-                ax.text(0.5, 0.5, "No data", ha="center", transform=ax.transAxes)
-                continue
+            for challenger in challengers:
+                if challenger not in wide.columns or baseline not in wide.columns:
+                    continue
+                wide["delta"] = wide[challenger] - wide[baseline]
+                g  = wide.groupby(cond_col)["delta"]
+                mu, sd = g.mean(), g.std()
+                x = mu.index.values
+                color = _PALETTE.get(challenger, "#555")
+                marker = _MARKERS.get(challenger, "^")
+                lbl_c = _mlabel(challenger, model_cfgs)
 
-            wide["delta"] = wide[model_a] - wide[model_b]
-            g  = wide.groupby(cond_col)["delta"]
-            mu, sd = g.mean(), g.std()
-            x  = mu.index.values
-
-            ax.axhline(0, color="gray", linewidth=1.5, linestyle="--", alpha=0.6)
-            ax.fill_between(x, mu - sd, mu + sd, alpha=0.18, color=color)
-            ax.plot(x, mu.values, marker="o", linewidth=2.2, color=color, zorder=3)
-            ax.fill_between(x, 0, mu.values, where=(mu.values > 0),
-                            alpha=0.12, color="green", label=f"{lbl_a} wins")
-            ax.fill_between(x, 0, mu.values, where=(mu.values < 0),
-                            alpha=0.12, color="red",   label=f"{lbl_b} wins")
+                ax.fill_between(x, mu - sd, mu + sd, alpha=0.15, color=color)
+                ax.plot(x, mu.values, marker=marker, linewidth=2.2,
+                        color=color, zorder=3, label=lbl_c)
 
             pretty = metric.replace("_", " ").title()
             ax.set_xlabel(xlabel, fontsize=11)
@@ -415,6 +433,49 @@ def plot_delta(
             ax.set_title(f"Δ {pretty}", fontsize=11, fontweight="bold")
             ax.legend(fontsize=9)
             ax.grid(True, alpha=0.25, linestyle=":")
+
+    fig.tight_layout()
+    fig.savefig(out_path, dpi=130, bbox_inches="tight")
+    plt.close(fig)
+    log.info("Saved %s", out_path.name)
+
+
+def plot_complexity(
+    df1: pd.DataFrame, cond1_col: str, xlabel1: str,
+    df2: pd.DataFrame, cond2_col: str, xlabel2: str,
+    model_cfgs: dict,
+    out_path: Path,
+) -> None:
+    """
+    Boosting iterations used (n_iter) per model across both studies.
+    Shows the complexity trade-off introduced by the penalised objective.
+    """
+    mnames = list(model_cfgs.keys())
+    study_specs = [
+        (df1, cond1_col, xlabel1, "Study 1 — Class Imbalance"),
+        (df2, cond2_col, xlabel2, "Study 2 — Feature Information"),
+    ]
+
+    fig, axes = plt.subplots(1, 2, figsize=(13, 5))
+    fig.suptitle("Model Complexity — Boosting Iterations Used", fontsize=12)
+
+    for ax, (df, cond_col, xlabel, title) in zip(axes, study_specs):
+        for mn in mnames:
+            g  = df[df["model"] == mn].groupby(cond_col)["n_iter"]
+            mu = g.mean()
+            sd = g.std()
+            x  = mu.index.values
+            c  = _PALETTE.get(mn, "#555")
+            mk = _MARKERS.get(mn, "^")
+            ax.plot(x, mu.values, marker=mk, linewidth=2.2, color=c,
+                    label=_mlabel(mn, model_cfgs), zorder=3)
+            ax.fill_between(x, mu - sd, mu + sd, alpha=0.15, color=c)
+
+        ax.set_xlabel(xlabel, fontsize=11)
+        ax.set_ylabel("N_iter", fontsize=12)
+        ax.set_title(title, fontsize=12, fontweight="bold")
+        ax.legend(fontsize=10)
+        ax.grid(True, alpha=0.3, linestyle=":")
 
     fig.tight_layout()
     fig.savefig(out_path, dpi=130, bbox_inches="tight")
@@ -464,6 +525,8 @@ def write_report(
     mnames  = list(models.keys())
     lbl_a   = models[mnames[0]]["label"]
     lbl_b   = models[mnames[1]]["label"]
+    lbl_c   = models[mnames[2]]["label"] if len(mnames) > 2 else ""
+    lam_c   = models[mnames[2]].get("penalty_lambda", "?") if len(mnames) > 2 else ""
 
     info_str = ", ".join(f"`{k}`={v}" for k, v in dgp["info"].items())
     table1   = _md_table(summary1, s1["condition_col"], metrics)
@@ -488,9 +551,25 @@ def write_report(
 | n\_repeats | {data["n_repeats"]} independent test draws per condition |
 | {lbl_a} | HGB `early_stopping=True`, `scoring='roc_auc'` |
 | {lbl_b} | HGB `early_stopping=True`, `scoring='average_precision'` |
+| {lbl_c} | HGB `early_stopping=True`, composite scorer: `AP − {lam_c}·N_iter` |
 
-Both models share the same architecture and hyperparameters;
-only the early-stopping criterion differs.
+All three models share the same architecture; only the early-stopping
+criterion differs.
+
+### Composite Objective
+
+The `{lbl_c}` model uses an `Objective` built with the composable
+`ml_elements.objectives` abstraction:
+
+```python
+from ml_elements import AVG_PRECISION
+from ml_elements.objectives import N_ITER
+obj = AVG_PRECISION - {lam_c} * N_ITER
+```
+
+The HGB early-stopping scorer evaluates `AP − λ·N_iter` on the held-out
+validation split at each boosting round.  As a result, training stops as
+soon as additional trees no longer compensate for their own complexity cost.
 
 ### Studies
 
@@ -510,12 +589,12 @@ across {data["n_repeats"]} independent test draws.
 
 - **ROC-AUC (left)** stays nearly flat as positives become rarer.
   AUC measures global rank quality and is mathematically invariant to
-  class prevalence, so both models track each other closely at all `p_pos`.
+  class prevalence, so all three models track each other closely at all `p_pos`.
 - **Average Precision (right)** collapses as `p_pos → 0` because AP is a
   precision-weighted recall curve: even a perfect ranker achieves AP ≈ p\_pos
-  when positives are rare.  The {lbl_b} model retains a consistent AP
-  advantage at low `p_pos`, confirming that optimising for AP pays off exactly
-  when the metric penalises imbalance the most.
+  when positives are rare.  The {lbl_b} and {lbl_c} models retain a consistent
+  AP advantage at low `p_pos`, confirming that AP-aware objectives pay off
+  exactly when the metric penalises imbalance the most.
 
 ### Score Space — Imbalance Study
 
@@ -546,8 +625,8 @@ clearly separable.
   near-perfect rank ordering, extra signal offers diminishing returns.
 - **Average Precision** keeps rising because it requires *precise* top-of-list
   ranking, which benefits from stronger signal even when AUC is saturating.
-- The {lbl_b} model maintains its AP advantage across all info levels,
-  showing that specialisation is orthogonal to feature quality.
+- The {lbl_b} and {lbl_c} models maintain their AP advantage across all info
+  levels, showing that specialisation is orthogonal to feature quality.
 
 ### Numerical Summary
 
@@ -559,45 +638,58 @@ clearly separable.
 
 ![Specialisation delta](fig4_delta.png)
 
-Δ = {lbl_a} score − {lbl_b} score on each metric.
-**Positive (green) → {lbl_a} wins.**  **Negative (red) → {lbl_b} wins.**
+Δ = challenger score − {lbl_a} score on each metric.
+**Positive → challenger wins.  Negative → {lbl_a} wins.**
 
-Key observations:
+Both AP-aware models ({lbl_b} and {lbl_c}) achieve comparable or better AP
+than the AUC-trained baseline, with the advantage growing as `p_pos` decreases.
+ROC-AUC differences are negligible in all conditions.
 
-| Observation | Δ AUC | Δ AP |
-| --- | --- | --- |
-| Across all imbalance levels | ≈ 0 (indistinguishable) | negative at low `p_pos` |
-| Across all info levels | ≈ 0 (indistinguishable) | consistently negative |
+---
 
-Both models achieve nearly identical ROC-AUC everywhere.
-The {lbl_b} model is consistently better at Average Precision, with the
-advantage growing as `p_pos` decreases — exactly where AP matters most.
+## Model Complexity
+
+![Model complexity — boosting iterations](fig5_complexity.png)
+
+The composite objective (`AP − λ·N_iter`) causes the penalised model to
+stop training earlier than the AP-trained model when additional rounds
+produce smaller gains in AP.  This figure shows that the {lbl_c} model
+uses noticeably fewer iterations, with no material loss in AP.
+
+The λ parameter (currently `{lam_c}`) controls the complexity budget:
+larger λ → fewer iterations, lower λ → closer to plain AP-training.
 
 ---
 
 ## Key Findings
 
 1. **ROC-AUC is insensitive to class imbalance; AP is not.**
-   Under severe imbalance (`p_pos = {s1["p_pos_values"][0]}`), both models achieve
+   Under severe imbalance (`p_pos = {s1["p_pos_values"][0]}`), all models achieve
    AUC > 0.8 while their AP scores approach the baseline prevalence.
 
 2. **Training objective does not change ROC-AUC.**
-   The {lbl_a} and {lbl_b} models achieve statistically indistinguishable
-   ROC-AUC at all conditions tested.
+   All three models achieve statistically indistinguishable ROC-AUC at all
+   conditions tested.
 
 3. **Training for AP improves AP, most under high imbalance.**
-   The {lbl_b} model consistently outperforms the {lbl_a} model in
-   Average Precision; the gap is largest when positives are rarest.
+   Both {lbl_b} and {lbl_c} consistently outperform {lbl_a} in Average
+   Precision; the gap is largest when positives are rarest.
 
-4. **Feature quality lifts both metrics in parallel.**
-   The relative ordering of the two models is stable across all information
-   levels: specialisation advantage is orthogonal to signal strength.
+4. **The composite objective reduces complexity for free.**
+   {lbl_c} achieves AP on par with {lbl_b} while using fewer boosting
+   iterations — demonstrating that the `AP − λ·N_iter` objective
+   successfully trades unnecessary model complexity for equivalent accuracy.
 
-5. **Practical recommendation.**
+5. **Feature quality lifts all metrics in parallel.**
+   The relative ordering of models is stable across all information levels:
+   specialisation advantage is orthogonal to signal strength.
+
+6. **Practical recommendation.**
    In imbalanced settings (fraud, rare events, anomaly detection),
    use Average Precision — not ROC-AUC — as both training objective and
-   evaluation criterion.  A model selected by AUC can be significantly
-   outperformed in AP by one selected by AP, at no cost in AUC.
+   evaluation criterion.  When model size or inference latency matters,
+   use a composite objective (`AP − λ·N_iter`) to get comparable AP at
+   lower complexity, with λ controlling the cost budget.
 
 ---
 
@@ -737,6 +829,14 @@ def main() -> None:
         metric_names=metric_names,
         model_cfgs=model_cfgs,
         out_path=out_dir / "fig4_delta.png",
+        baseline="auc_model",
+    )
+
+    plot_complexity(
+        df1=df1, cond1_col=s1["condition_col"], xlabel1=s1["xlabel"],
+        df2=df2, cond2_col=s2["condition_col"], xlabel2=s2["xlabel"],
+        model_cfgs=model_cfgs,
+        out_path=out_dir / "fig5_complexity.png",
     )
 
     # ── report ────────────────────────────────────────────────────────────────

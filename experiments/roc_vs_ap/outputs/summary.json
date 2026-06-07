@@ -9,7 +9,8 @@
     ],
     "models": [
       "auc_model",
-      "ap_model"
+      "ap_model",
+      "penalized_model"
     ]
   },
   "imbalance": [
@@ -108,6 +109,54 @@
       "roc_auc_std": 0.007042433872064296,
       "average_precision_mean": 0.7160629302314077,
       "average_precision_std": 0.009732405984848357
+    },
+    {
+      "model": "penalized_model",
+      "p_pos": 0.02,
+      "roc_auc_mean": 0.6741629920977306,
+      "roc_auc_std": 0.027707291755181173,
+      "average_precision_mean": 0.048198676469017446,
+      "average_precision_std": 0.00937870689443039
+    },
+    {
+      "model": "penalized_model",
+      "p_pos": 0.05,
+      "roc_auc_mean": 0.7172490810898297,
+      "roc_auc_std": 0.015873168090354675,
+      "average_precision_mean": 0.1265344287513012,
+      "average_precision_std": 0.01064493309606567
+    },
+    {
+      "model": "penalized_model",
+      "p_pos": 0.1,
+      "roc_auc_mean": 0.7128887926696065,
+      "roc_auc_std": 0.013407215573466894,
+      "average_precision_mean": 0.2287217666415739,
+      "average_precision_std": 0.018763901051121103
+    },
+    {
+      "model": "penalized_model",
+      "p_pos": 0.2,
+      "roc_auc_mean": 0.7315866619463205,
+      "roc_auc_std": 0.008264718090665093,
+      "average_precision_mean": 0.4086839586109874,
+      "average_precision_std": 0.012601554185481258
+    },
+    {
+      "model": "penalized_model",
+      "p_pos": 0.35,
+      "roc_auc_mean": 0.7381377960927944,
+      "roc_auc_std": 0.0075801117353884555,
+      "average_precision_mean": 0.6002989531987704,
+      "average_precision_std": 0.014121055091161069
+    },
+    {
+      "model": "penalized_model",
+      "p_pos": 0.5,
+      "roc_auc_mean": 0.7377837121644238,
+      "roc_auc_std": 0.007133476563409217,
+      "average_precision_mean": 0.7236386870565887,
+      "average_precision_std": 0.009400274483089196
     }
   ],
   "feature_info": [
@@ -206,6 +255,54 @@
       "roc_auc_std": 0.00837557977355499,
       "average_precision_mean": 0.5236257722661505,
       "average_precision_std": 0.022539508213589545
+    },
+    {
+      "model": "penalized_model",
+      "info_scale": 0.1,
+      "roc_auc_mean": 0.49993413069870896,
+      "roc_auc_std": 0.01725010252648021,
+      "average_precision_mean": 0.10059507739408713,
+      "average_precision_std": 0.006390563522023297
+    },
+    {
+      "model": "penalized_model",
+      "info_scale": 0.3,
+      "roc_auc_mean": 0.5539987447046235,
+      "roc_auc_std": 0.011976109699373282,
+      "average_precision_mean": 0.11860159960094174,
+      "average_precision_std": 0.006572760030405076
+    },
+    {
+      "model": "penalized_model",
+      "info_scale": 0.5,
+      "roc_auc_mean": 0.5899157403200395,
+      "roc_auc_std": 0.013601990443403439,
+      "average_precision_mean": 0.126787494229442,
+      "average_precision_std": 0.007317596320232663
+    },
+    {
+      "model": "penalized_model",
+      "info_scale": 0.8,
+      "roc_auc_mean": 0.6727439324551627,
+      "roc_auc_std": 0.011325476912294847,
+      "average_precision_mean": 0.18957391313790914,
+      "average_precision_std": 0.013088786729948627
+    },
+    {
+      "model": "penalized_model",
+      "info_scale": 1.2,
+      "roc_auc_mean": 0.7718964059037041,
+      "roc_auc_std": 0.009504775589781907,
+      "average_precision_mean": 0.30594019822230006,
+      "average_precision_std": 0.017749382298758096
+    },
+    {
+      "model": "penalized_model",
+      "info_scale": 1.8,
+      "roc_auc_mean": 0.8726032423732205,
+      "roc_auc_std": 0.008313354163695568,
+      "average_precision_mean": 0.5268368799307968,
+      "average_precision_std": 0.021819419119203032
     }
   ]
 }
