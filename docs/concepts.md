@@ -28,6 +28,10 @@ budget = DataBudget(
     seed_test_base=10_000,  # each repeat gets seed_test_base + repeat_index
     n_repeats=30,           # how many independent test draws to average over
 )
+
+# Convenience constructor for fast prototyping
+budget = DataBudget.quick()                    # 500 / 100 / 500, 10 repeats
+budget = DataBudget.quick(n=2000, n_repeats=20)
 ```
 
 `n_repeats` is the main knob for measurement precision. More repeats = tighter confidence intervals.
@@ -148,15 +152,27 @@ A `TrialRunner` fits one or more named model **setups** on the same training dat
 ```python
 from ml_elements import TrialRunner
 
+# Same model, different features
 runner = TrialRunner(
     setups={"baseline": ["x1", "x2"], "challenger": ["x1", "x2", "x3"]},
     model_factory=make_hgb(),
     metrics=[AUC, AVG_PRECISION],
     budget=budget,
 )
+
+# Different models — pass (features, factory) tuples
+runner = TrialRunner(
+    setups={
+        "auc_model": (["x1", "x2", "x3"], make_hgb(scoring="roc_auc")),
+        "ap_model":  (["x1", "x2", "x3"], make_hgb(scoring="average_precision")),
+    },
+    model_factory=None,
+    metrics=[AUC, AVG_PRECISION],
+    budget=budget,
+)
 ```
 
-`setups` maps a name to a list of feature columns. Every setup uses the same model factory and budget.
+You can mix both forms in the same `setups` dict: setups without a factory use the shared `model_factory`; setups with a `(features, factory)` tuple override it.
 
 ---
 
@@ -169,11 +185,16 @@ from ml_elements import Study
 
 study  = Study(runner, primary_metric=AUC)
 result = study.run(trials)           # StudyResult
-improv = study.improvements(result, baseline="baseline", challenger="challenger")
-summary = study.summarize(improv)    # DataFrame, one row per trial
+
+# Primary-metric improvement only
+improv  = study.improvements(result, baseline="baseline", challenger="challenger")
+summary = study.summarize(improv)    # one row per trial
+
+# All metrics for both setups in one table
+summary = study.full_summary(result, baseline="baseline", challenger="challenger")
 ```
 
-`improvements` computes the per-trial delta between challenger and baseline on the primary metric.
+`improvements` computes the per-trial delta on the primary metric. `full_summary` adds `{setup}_{metric}_mean` columns for every tracked metric.
 
 ---
 

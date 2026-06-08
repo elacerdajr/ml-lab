@@ -28,19 +28,31 @@ runner = TrialRunner(
 
 ## Compare AUC-trained vs AP-trained models
 
+Each setup can carry its own model factory as a `(features, factory)` tuple. Setups that only specify a feature list still use the shared `model_factory`.
+
 ```python
 from ml_elements import AUC, AVG_PRECISION, make_hgb, TrialRunner
-
-setups = {
-    "auc_model": ["x1", "x2", "x3"],
-    "ap_model":  ["x1", "x2", "x3"],
-}
 
 runner = TrialRunner(
     setups={
         "auc_model": (["x1", "x2", "x3"], make_hgb(scoring="roc_auc")),
         "ap_model":  (["x1", "x2", "x3"], make_hgb(scoring="average_precision")),
     },
+    model_factory=None,   # every setup supplies its own factory
+    metrics=[AUC, AVG_PRECISION],
+    budget=budget,
+)
+```
+
+You can also mix the two forms — some setups with a shared factory, one with a custom one:
+
+```python
+runner = TrialRunner(
+    setups={
+        "default":  ["x1", "x2"],                                        # uses model_factory
+        "ap_tuned": (["x1", "x2"], make_hgb(scoring="average_precision")), # overrides
+    },
+    model_factory=make_hgb(),
     metrics=[AUC, AVG_PRECISION],
     budget=budget,
 )
@@ -215,4 +227,32 @@ p_hat = model.predict_proba(X_new)[:, 1]
 
 ```python
 result.scores.to_csv("scores.csv", index=False)
+```
+
+---
+
+## Quick budget for prototyping
+
+```python
+from ml_elements import DataBudget
+
+budget = DataBudget.quick()                   # 500 train / 100 valid / 500 test, 10 repeats
+budget = DataBudget.quick(n=2000, n_repeats=20)
+```
+
+Scale up to the full budget only when you're happy with the experiment design.
+
+---
+
+## Get mean scores for all metrics in one table
+
+```python
+summary = study.full_summary(result, baseline="without_x3", challenger="with_x3")
+
+# shows AUC and AP for both setups at every trial value
+summary[[
+    "trial_value",
+    "without_x3_auc_mean", "with_x3_auc_mean",
+    "without_x3_average_precision_mean", "with_x3_average_precision_mean",
+]]
 ```
