@@ -202,7 +202,7 @@ class TrialRunner:
                 "features": ",".join(features),
             }
             for metric in self.metrics:
-                row[metric.name] = metric.score(y_test, p_hat)
+                row[metric.name] = metric.score(y_test, p_hat, model=model)
 
             rows.append(row)
 

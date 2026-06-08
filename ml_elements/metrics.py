@@ -66,7 +66,7 @@ class Metric:
     direction: Literal["higher", "lower"]
     fn: MetricFn
 
-    def score(self, y_true: np.ndarray, y_score: np.ndarray) -> float:
+    def score(self, y_true: np.ndarray, y_score: np.ndarray, model=None) -> float:
         """
         Compute the metric, clipping y_score to avoid numerical issues.
 
@@ -76,6 +76,9 @@ class Metric:
             True binary labels (0 / 1).
         y_score : np.ndarray
             Model scores or probabilities.
+        model : optional
+            Ignored by base Metric; accepted so Objective and Metric share
+            the same call signature.
 
         Returns
         -------
@@ -102,6 +105,38 @@ class Metric:
         """
         delta = score_challenger - score_baseline
         return delta if self.direction == "higher" else -delta
+
+    # ── arithmetic: promotes to Objective ────────────────────────────────────
+
+    def __add__(self, other):
+        from .objectives import Objective
+        return Objective._coerce(self).__add__(other)
+
+    def __radd__(self, other):
+        from .objectives import Objective
+        return Objective._coerce(self).__radd__(other)
+
+    def __sub__(self, other):
+        from .objectives import Objective
+        return Objective._coerce(self).__sub__(other)
+
+    def __rsub__(self, other):
+        from .objectives import Objective
+        return Objective._coerce(self).__rsub__(other)
+
+    def __mul__(self, scalar: float):
+        from .objectives import Objective
+        return Objective._coerce(self).__mul__(scalar)
+
+    def __rmul__(self, scalar: float):
+        return self.__mul__(scalar)
+
+    def __truediv__(self, scalar: float):
+        from .objectives import Objective
+        return Objective._coerce(self).__truediv__(scalar)
+
+    def __neg__(self):
+        return self.__mul__(-1.0)
 
 
 # ---------------------------------------------------------------------------

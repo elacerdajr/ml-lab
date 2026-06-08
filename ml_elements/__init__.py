@@ -72,6 +72,14 @@ Typical flow
 
 from .analysis import Comparator
 from .dgp import GaussianBinaryDGP, RealDataDGP, ShiftedDGP
+from .objectives import (
+    COEF_L1,
+    N_ITER,
+    N_LEAVES,
+    ModelMetric,
+    Objective,
+    make_objective,
+)
 from .metrics import (
     ALL_METRICS,
     AVG_PRECISION,
@@ -109,6 +117,13 @@ __all__ = [
     "make_hgb",
     "make_catboost",
     "make_sklearn",
+    # Objectives
+    "Objective",
+    "ModelMetric",
+    "make_objective",
+    "N_ITER",
+    "N_LEAVES",
+    "COEF_L1",
     # Metrics
     "Metric",
     "AUC",
