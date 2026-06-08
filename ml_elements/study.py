@@ -205,6 +205,55 @@ class Study:
             .reset_index()
         )
 
+    def full_summary(
+        self,
+        result: StudyResult,
+        baseline: str,
+        challenger: str,
+    ) -> pd.DataFrame:
+        """
+        Like ``summarize()``, but adds mean scores for **every** tracked metric
+        and both setups as extra columns.
+
+        Parameters
+        ----------
+        result : StudyResult
+        baseline : str
+        challenger : str
+
+        Returns
+        -------
+        pd.DataFrame
+            One row per (trial_name, trial_value). All columns from
+            ``summarize()`` plus ``{setup}_{metric}_mean`` for every
+            (setup, metric) combination.
+
+        Examples
+        --------
+        >>> summary = study.full_summary(result, baseline="without_x3", challenger="with_x3")
+        >>> summary[["trial_value", "without_x3_auc_mean", "with_x3_auc_mean",
+        ...           "without_x3_average_precision_mean", "with_x3_average_precision_mean"]]
+        """
+        improv = self.improvements(result, baseline, challenger)
+        summary = self.summarize(improv)
+
+        key_cols = ["trial_name", "trial_value"]
+        scores = result.scores
+        metric_names = [m.name for m in self.runner.metrics]
+
+        for setup in (baseline, challenger):
+            subset = scores[scores["setup"] == setup]
+            means = (
+                subset
+                .groupby(key_cols)[metric_names]
+                .mean()
+                .rename(columns={m: f"{setup}_{m}_mean" for m in metric_names})
+                .reset_index()
+            )
+            summary = summary.merge(means, on=key_cols, how="left")
+
+        return summary
+
     def _run_trials(self, trials: list[Trial]) -> list[TrialResult]:
         if self.n_jobs == 1:
             return self._run_sequential(trials)

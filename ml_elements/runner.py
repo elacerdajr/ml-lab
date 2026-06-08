@@ -71,12 +71,31 @@ class TrialRunner:
 
     Parameters
     ----------
-    setups : dict[str, list[str]]
-        Mapping from setup name to the list of feature columns it uses.
-        Example: ``{"baseline": ["x1", "x2"], "challenger": ["x1", "x2", "x3"]}``.
+    setups : dict[str, list[str] | tuple[list[str], Callable]]
+        Mapping from setup name to either:
+
+        * ``list[str]`` — feature columns; the shared ``model_factory`` is used.
+        * ``(list[str], factory)`` — feature columns **and** a per-setup
+          model factory that overrides the shared one for this setup only.
+
+        Examples::
+
+            # same model, different features
+            setups = {
+                "baseline":   ["x1", "x2"],
+                "challenger": ["x1", "x2", "x3"],
+            }
+
+            # different models, same features
+            setups = {
+                "auc_model": (["x1", "x2", "x3"], make_hgb(scoring="roc_auc")),
+                "ap_model":  (["x1", "x2", "x3"], make_hgb(scoring="average_precision")),
+            }
+
     model_factory : Callable[[], ModelBackend]
-        Zero-argument factory that creates a fresh, unfitted model. Called
-        once per setup per trial.
+        Default zero-argument factory. Used for any setup that does not
+        specify its own factory. May be ``None`` if every setup supplies
+        its own factory.
     metrics : list[Metric]
         All metrics to score on each test repeat. All are recorded in
         ``TrialResult.scores``; the primary metric (for improvement
@@ -102,8 +121,8 @@ class TrialRunner:
 
     def __init__(
         self,
-        setups: dict[str, list[str]],
-        model_factory: Callable[[], ModelBackend],
+        setups: dict[str, "list[str] | tuple[list[str], Callable]"],
+        model_factory: "Callable[[], ModelBackend] | None",
         metrics: list[Metric],
         budget: DataBudget,
         target_col: str = "y",
@@ -113,7 +132,19 @@ class TrialRunner:
         if not metrics:
             raise ValueError("metrics must not be empty.")
 
-        self.setups = setups
+        # Normalise setups: always store features and per-setup factory separately.
+        # Per-setup factory takes precedence over model_factory; None = use default.
+        self.setups: dict[str, list[str]] = {}
+        self._setup_factories: dict[str, Callable | None] = {}
+        for name, spec in setups.items():
+            if isinstance(spec, list):
+                self.setups[name] = spec
+                self._setup_factories[name] = None
+            else:
+                features, fac = spec
+                self.setups[name] = list(features)
+                self._setup_factories[name] = fac
+
         self.model_factory = model_factory
         self.metrics = metrics
         self.budget = budget
@@ -166,13 +197,19 @@ class TrialRunner:
     def _fit_models(
         self,
         df_train: pd.DataFrame,
-        factory: Callable[[], ModelBackend],
+        factory: "Callable[[], ModelBackend] | None",
     ) -> dict[str, ModelBackend]:
         models: dict[str, ModelBackend] = {}
         y_train = df_train[self.target_col]
 
         for setup_name, features in self.setups.items():
-            model = factory()
+            setup_fac = self._setup_factories.get(setup_name) or factory
+            if setup_fac is None:
+                raise ValueError(
+                    f"No model factory for setup {setup_name!r}. "
+                    "Provide model_factory on the runner or a per-setup factory in setups."
+                )
+            model = setup_fac()
             model.fit(df_train[features], y_train)
             models[setup_name] = model
 

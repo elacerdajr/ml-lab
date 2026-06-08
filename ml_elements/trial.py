@@ -70,6 +70,33 @@ class DataBudget:
             if getattr(self, attr) < 1:
                 raise ValueError(f"{attr} must be >= 1, got {getattr(self, attr)}")
 
+    @classmethod
+    def quick(cls, n: int = 500, n_repeats: int = 10) -> "DataBudget":
+        """
+        Convenience constructor for fast prototyping.
+
+        Parameters
+        ----------
+        n : int
+            Train and test size. Validation is set to ``n // 5`` (min 50).
+        n_repeats : int
+            Number of test repeats.
+
+        Examples
+        --------
+        >>> budget = DataBudget.quick()           # 500 / 100 / 500, 10 repeats
+        >>> budget = DataBudget.quick(n=2000, n_repeats=20)
+        """
+        return cls(
+            n_train=n,
+            n_valid=max(50, n // 5),
+            n_test=n,
+            seed_train=1,
+            seed_valid=2,
+            seed_test_base=10_000,
+            n_repeats=n_repeats,
+        )
+
 
 @dataclass
 class Trial:
