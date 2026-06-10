@@ -1,0 +1,130 @@
+site,description,pca_1,pca_2,pca_3
+Google,Google is a search engine and web services company that helps people find information and use cloud productivity tools.,-0.10057085220932917,-0.08473030664027938,-0.1972176653188928
+YouTube,"YouTube is a video sharing platform for watching, uploading, streaming, and discussing videos across entertainment, education, and news.",-0.16594776651938176,0.03582341610936452,-0.008280275874054242
+Facebook,"Facebook is a social network for connecting with friends, groups, events, pages, and community discussions.",0.0,0.2196729603349638,-0.07107843903067239
+Instagram,"Instagram is a visual social platform for sharing photos, short videos, stories, reels, and creator updates.",-0.23711488710620263,0.04652987409578575,-0.01516735159450789
+Wikipedia,Wikipedia is a collaborative online encyclopedia that provides freely editable articles on knowledge across many disciplines.,0.0,0.0,0.0
+Amazon,"Amazon is an ecommerce marketplace and cloud technology company offering retail shopping, subscriptions, logistics, and web infrastructure.",-0.1356278082816991,0.0,0.001850576623124645
+Netflix,"Netflix is a streaming entertainment service offering films, television series, documentaries, and original programming on demand.",-0.16755931553260003,-0.12119977283693917,-0.008360687142574985
+Spotify,"Spotify is an audio streaming service for music, podcasts, playlists, artist discovery, and personalized listening recommendations.",0.0,0.0,0.0
+LinkedIn,"LinkedIn is a professional networking site for resumes, jobs, hiring, business updates, and industry conversations.",0.18153559334620054,-0.03753985074326494,0.01293403448888401
+Reddit,"Reddit is a community discussion platform organized into topic forums where users share posts, links, and comments.",-0.18293862529077726,0.14512632134373693,0.23923718105381306
+X,"X is a real time social media platform for short posts, breaking news, public conversation, and creator updates.",-0.23220225849976361,0.09626750262760023,0.10428533869188415
+TikTok,"TikTok is a short form video platform focused on algorithmic entertainment, trends, music clips, and creator discovery.",-0.0580198373025051,0.16873427649862888,-0.05373537420868321
+Pinterest,"Pinterest is a visual discovery site for saving and organizing ideas about design, fashion, recipes, travel, and hobbies.",0.1450089371304768,-0.0011267213578638662,-0.0019785776427238898
+Twitch,"Twitch is a live streaming platform centered on gaming, esports, music, chat communities, and interactive broadcasts.",-0.11442253559484482,0.0,0.0
+Discord,"Discord is a communication platform for voice, video, text chat, community servers, and private groups.",-0.22675352976050617,0.09739750504681968,0.10550945567627097
+GitHub,"GitHub is a software development platform for hosting code repositories, issues, pull requests, documentation, and collaboration.",-0.2686937676390147,0.11541210678091943,0.12502444040073574
+Stack Overflow,Stack Overflow is a question and answer site where programmers solve technical problems and share coding knowledge.,0.07105251865388341,0.23540381033524738,-0.07742365244577697
+Khan Academy,"Khan Academy is an education site providing free lessons, practice exercises, and videos for students and teachers.",0.0,0.0,0.0
+Coursera,"Coursera is an online learning platform offering university courses, professional certificates, degrees, and career skills training.",0.0,0.0,0.0
+Udemy,"Udemy is an online course marketplace where instructors sell practical classes on business, technology, creative, and personal topics.",0.0,0.0,0.0
+Duolingo,"Duolingo is a language learning app that uses short lessons, practice streaks, and gamified exercises.",-0.08661399464217089,0.0,0.0
+OpenAI,"OpenAI is an artificial intelligence company providing research, models, developer APIs, and conversational AI products.",0.0,0.0,0.0
+Hugging Face,"Hugging Face is a machine learning community platform for sharing models, datasets, demos, and open source tools.",-0.2123217719719773,0.04166463539349745,-0.013581428842236834
+Kaggle,"Kaggle is a data science platform for competitions, notebooks, datasets, discussions, and machine learning practice.",-0.21270980282843072,0.08818622882913571,0.0955309994586869
+Apple,"Apple is a technology company site for buying devices, learning about software, support, services, and developer resources.",0.24174773940645652,-0.10383797197673678,-0.11248633008131781
+Microsoft,"Microsoft is a technology company site for software, cloud services, devices, productivity products, and developer tools.",0.2429463302247403,-0.10435280301551345,-0.1130440398772768
+Adobe,"Adobe is a creative software site for design, photography, video editing, document management, and marketing tools.",0.11634691031087546,0.0,0.0
+Canva,"Canva is a design platform for creating presentations, social graphics, documents, videos, and brand assets with templates.",-0.17705131497808657,0.036612544216058376,-0.01261453895634494
+Figma,"Figma is a collaborative design tool for interface design, prototyping, whiteboarding, and product team workflows.",0.0,0.0,0.0
+Dribbble,"Dribbble is a design portfolio community where creatives share visual work, find inspiration, and discover job opportunities.",-0.18488315340354436,0.07664972585136516,0.08303365520939501
+Behance,"Behance is a creative portfolio platform for showcasing design, photography, illustration, branding, and digital art projects.",-0.17913021969360376,0.0370424421291423,-0.012762656605308264
+Etsy,"Etsy is an ecommerce marketplace for handmade goods, vintage items, craft supplies, gifts, and independent sellers.",-0.06469575973792101,-0.1953458584121582,0.06425243950419345
+eBay,"eBay is an online marketplace for auctions, used goods, collectibles, electronics, motors, and consumer merchandise.",0.0,0.0,0.0
+Walmart,"Walmart is a retail site for groceries, household goods, electronics, pharmacy services, delivery, and pickup orders.",0.14356113019365005,-0.029687089460888064,0.010228432755039665
+Target,"Target is a retail site for home goods, clothing, beauty, groceries, electronics, and seasonal shopping.",0.13164237425691638,-0.027222403000987543,0.009379246116162098
+Best Buy,"Best Buy is a retail site for consumer electronics, appliances, computers, entertainment products, and tech support.",0.12165193886660818,-0.02660989869519604,0.00866744831653837
+Airbnb,"Airbnb is a travel marketplace for booking homes, rooms, experiences, and short term stays from hosts.",0.0,0.0,0.0
+Booking.com,"Booking.com is a travel booking site for hotels, apartments, flights, car rentals, attractions, and vacation packages.",0.0,0.0,0.0
+Expedia,"Expedia is an online travel agency for comparing and booking flights, hotels, rental cars, cruises, and activities.",0.0,0.0,0.0
+Tripadvisor,"Tripadvisor is a travel review site for researching hotels, restaurants, attractions, vacation ideas, and traveler opinions.",0.17729074351677448,-0.03666205578258012,0.012631597743109175
+Yelp,"Yelp is a local business review site for discovering restaurants, services, shops, photos, ratings, and customer feedback.",0.1696254740657096,-0.03661732885988814,0.0084637820079806
+DoorDash,"DoorDash is a delivery marketplace for ordering restaurant meals, groceries, convenience items, and local retail products.",0.0,0.0,0.0
+Uber,"Uber is a mobility and delivery platform for ride hailing, food delivery, freight, and urban transportation services.",0.0,0.0,0.0
+Lyft,"Lyft is a ride sharing platform for booking local transportation, bikes, scooters, and driver services.",-0.32640142394785765,0.09087409340777262,0.0984427283421648
+Google Maps,"Google Maps is a mapping service for directions, local search, transit routes, business listings, and geographic exploration.",0.0,0.0,0.0
+Waze,"Waze is a navigation app that uses community traffic reports for routing, hazards, road closures, and commute planning.",-0.08798465196034651,0.0,0.0
+The New York Times,"The New York Times is a news publisher covering politics, world events, culture, business, opinion, and investigative journalism.",0.06532017725940946,0.312011152062849,-0.15627301837954902
+BBC,"BBC is a public service broadcaster site providing global news, sport, weather, entertainment, audio, and video.",0.0,0.0,0.0
+CNN,"CNN is a news media site covering breaking news, politics, business, world affairs, health, and live video.",0.07342378249907494,0.35071917939488345,-0.17566021087796538
+Reuters,"Reuters is a news agency site focused on global business, markets, politics, technology, and factual reporting.",0.1566647332627602,0.17569884375636757,-0.059461790809085244
+Bloomberg,"Bloomberg is a financial media site covering markets, business news, economics, technology, and data driven analysis.",0.06336339091724517,0.3026642827404516,-0.1515915719897225
+The Wall Street Journal,"The Wall Street Journal is a business news site covering markets, companies, finance, economics, and opinion.",0.06773633787615327,0.22441698529895426,-0.07381011653112418
+NPR,"NPR is a public radio news site offering audio journalism, podcasts, culture stories, politics, and local station content.",0.0,0.0,0.0
+ESPN,"ESPN is a sports media site for scores, news, highlights, fantasy leagues, analysis, and live events.",0.15147120423156263,0.2604569556085975,0.07719129321664046
+NBA,"NBA is the official basketball league site for scores, schedules, teams, players, standings, tickets, and video highlights.",0.3358751212204789,0.13247233093374497,0.48764218764299655
+NFL,"NFL is the official football league site for games, teams, schedules, statistics, fantasy football, and video content.",0.3010134861028106,0.11872257165589813,0.4370281262269016
+MLB,"MLB is the official baseball league site for scores, standings, player stats, tickets, news, and highlights.",0.33509790268732986,0.13216578857848796,0.486513778535456
+FIFA,"FIFA is the international football federation site for tournaments, rankings, news, governance, and global match information.",0.16717536945916844,0.06593555005352318,0.24271450230331787
+IMDb,"IMDb is an entertainment database for movies, television, actors, ratings, reviews, trailers, and production details.",-0.06118475134341079,-0.20271095062534195,0.06667106265535051
+Rotten Tomatoes,"Rotten Tomatoes is a film and television review aggregator showing critic scores, audience ratings, trailers, and recommendations.",0.0,0.0,0.0
+Goodreads,"Goodreads is a book community for tracking reading, writing reviews, discovering books, and joining reader discussions.",0.0,0.0,0.0
+Project Gutenberg,Project Gutenberg is a digital library offering free public domain ebooks in multiple downloadable formats.,0.0,0.0,0.0
+Medium,"Medium is a publishing platform for essays, tutorials, personal writing, newsletters, and independent commentary.",-0.16585072289555575,0.06875917144515437,0.07448591982353377
+Substack,"Substack is a newsletter publishing platform for writers, podcasters, communities, subscriptions, and direct audience relationships.",-0.16694536716062536,0.06921299420443641,0.07497754014052574
+WordPress,"WordPress is a website building and blogging platform for publishing content, managing themes, and running online sites.",-0.17386423623878142,0.035953486353216116,-0.012387466206736272
+Squarespace,"Squarespace is a website builder for creating portfolios, online stores, blogs, and business landing pages.",0.0,0.0,0.0
+Wix,"Wix is a website creation platform offering templates, drag and drop editing, ecommerce tools, and hosting.",-0.1636101332936015,0.0012712528978747416,0.0022323820742615424
+Shopify,"Shopify is an ecommerce platform for building online stores, managing products, payments, shipping, and merchant operations.",-0.14037473896573602,-0.1470160365972236,0.0019153462235979217
+Stripe,"Stripe is a payments infrastructure site for online transactions, billing, subscriptions, fraud prevention, and financial APIs.",0.11050094264143637,0.0,0.0
+PayPal,"PayPal is a digital payments site for sending money, receiving payments, online checkout, and merchant services.",0.06596664902754326,-0.24292241525469727,0.07764529795496745
+Venmo,"Venmo is a mobile payments service for social money transfers, splitting expenses, and casual peer payments.",-0.07418732596167912,-0.2564372678863314,0.08452622741802489
+Coinbase,"Coinbase is a cryptocurrency exchange for buying, selling, storing, and learning about digital assets.",0.0,0.0,0.0
+Robinhood,"Robinhood is a financial app for stock trading, options, cryptocurrency, retirement accounts, and investing education.",0.10841434990222192,0.0,0.0
+Vanguard,"Vanguard is an investment management site for mutual funds, ETFs, retirement accounts, advice, and long term portfolios.",0.2526743755834917,-0.12821460482619815,-0.13826795771531222
+Fidelity,"Fidelity is a financial services site for brokerage accounts, retirement planning, wealth management, funds, and research.",0.3394423249281778,-0.0947951172317674,-0.10431057525208984
+Chase,"Chase is a banking site for checking accounts, credit cards, loans, mortgages, payments, and financial services.",0.14667892920738895,-0.032084251868835637,0.010450569467900179
+Bank of America,"Bank of America is a banking site for personal accounts, credit cards, lending, investing, and digital financial tools.",0.16709183239725747,-0.03654932896516413,0.011904946480194977
+Intuit,"Intuit is a financial software company site for tax filing, accounting, payroll, credit, and small business tools.",0.2063222828024274,-0.04048733489117528,0.013197663981529243
+TurboTax,"TurboTax is a tax preparation site for filing returns, estimating refunds, and navigating deductions and tax forms.",0.15228565282672057,-0.0011832615349888383,-0.002077864950623342
+Zillow,"Zillow is a real estate marketplace for home listings, property values, rentals, mortgage tools, and neighborhood research.",0.0,0.0,0.0
+Redfin,"Redfin is a real estate brokerage site for buying homes, selling homes, browsing listings, and comparing market data.",0.13532933972581335,-0.029601665654834176,0.009641934758400401
+Realtor.com,"Realtor.com is a real estate search site for homes, rentals, property details, agents, and housing market information.",0.12666330594142908,-0.02770607497835127,0.009024497826154818
+Indeed,"Indeed is a job search site for finding openings, posting resumes, researching employers, and applying to roles.",0.151090561145222,-0.0011739756568299063,-0.002061558495801935
+Glassdoor,"Glassdoor is a career site with job listings, company reviews, salary data, interview insights, and workplace ratings.",0.0,0.17610600106604057,0.0
+ZipRecruiter,ZipRecruiter is a recruiting marketplace that connects employers and job seekers through listings and matching tools.,0.0,0.0,0.0
+Slack,"Slack is a workplace communication platform for team messaging, channels, integrations, files, and collaboration workflows.",-0.2770792349436025,0.11901391882318904,0.12892623673366474
+Zoom,"Zoom is a video communications platform for meetings, webinars, phone calls, chat, events, and hybrid collaboration.",-0.21738405753208612,0.09337303310313078,0.10114979734663593
+Notion,"Notion is a productivity workspace for notes, databases, documents, project management, wikis, and team knowledge.",0.0,-0.18704855788784375,0.0
+Trello,"Trello is a visual project management tool using boards, lists, and cards to organize tasks and team workflows.",0.0,0.0,0.0
+Asana,"Asana is a work management platform for tracking projects, tasks, goals, timelines, and cross functional collaboration.",-0.1286052782202152,0.0,0.0017547575567280257
+Jira,"Jira is an issue tracking and agile project management tool for software teams planning, building, and releasing products.",0.0,0.0,0.0
+Salesforce,"Salesforce is a customer relationship management platform for sales, service, marketing, commerce, analytics, and automation.",-0.17238855546799375,0.0013394613541806715,0.002352159449341645
+HubSpot,"HubSpot is a marketing and sales platform for CRM, email campaigns, lead management, content, and customer service.",-0.17237420265655812,0.0013393498326461381,0.0023519636120892754
+Mailchimp,"Mailchimp is an email marketing platform for newsletters, audience segmentation, automation, landing pages, and campaign analytics.",-0.14928304012023785,0.0011599311945785537,0.0020368957352882903
+Cloudflare,"Cloudflare is an internet infrastructure company providing CDN, security, DNS, edge computing, and performance services.",0.0,0.0,0.0
+AWS,"AWS is a cloud computing platform offering compute, storage, databases, analytics, machine learning, and infrastructure services.",-0.16659220478434134,0.03269096431926222,-0.010656279636025718
+Google Cloud,"Google Cloud is a cloud platform for computing, data analytics, AI, storage, security, and developer infrastructure.",-0.20578932363798033,0.0403827504716875,-0.013163572579123697
+Azure,"Azure is Microsoft's cloud platform for applications, virtual machines, databases, AI services, and enterprise infrastructure.",-0.12524706765287846,0.0,0.0
+DigitalOcean,"DigitalOcean is a cloud hosting platform for developers using droplets, managed databases, Kubernetes, storage, and app hosting.",-0.15932439525915976,0.03126477692847479,-0.010191385070628948
+Heroku,"Heroku is a cloud application platform for deploying, managing, and scaling web apps and backend services.",-0.19057156979446177,0.04168523916396909,-0.013577829068604106
+Vercel,"Vercel is a frontend cloud platform for deploying web applications, serverless functions, previews, and edge experiences.",-0.2428443711447001,-0.14717379529697644,0.048534295593746286
+Netlify,"Netlify is a web development platform for hosting static sites, serverless functions, deployment previews, and Jamstack workflows.",-0.2472793957478282,-0.20921755925342989,0.06841797409792762
+Docker,"Docker is a container platform for building, sharing, running, and managing portable application environments.",-0.17164382282007634,-0.08672551505532726,-0.012229266356184963
+Kubernetes,"Kubernetes is an open source container orchestration project for deploying, scaling, and managing distributed applications.",-0.05879434432659853,-0.1947913028680142,0.06406631273824813
+Mozilla,"Mozilla is a nonprofit technology organization site for Firefox, privacy advocacy, open web projects, and developer resources.",0.21132629032677466,-0.09077103871488493,-0.09833109052817517
+DuckDuckGo,"DuckDuckGo is a privacy focused search engine offering web search, browser tools, email protection, and tracker blocking.",-0.06497406685236286,-0.10268822806012079,-0.23901639680982345
+Brave,"Brave is a privacy oriented browser site promoting faster browsing, ad blocking, search, rewards, and web privacy tools.",0.07255091674657344,-0.104470077641748,-0.24316381735357154
+Sporting News,"Sporting News is a sports news site covering scores, analysis, fantasy advice, rumors, and live event coverage.",0.1763599377578505,0.3032534976714737,0.08987484938934688
+Mayo Clinic,"Mayo Clinic is a health information site offering medical guidance, disease explanations, treatment options, and appointment services.",0.0,0.0,0.0
+WebMD,"WebMD is a health information site with symptom checkers, drug references, wellness articles, and condition guides.",0.11498332499850003,0.0,0.0
+CDC,"CDC is a public health site providing disease guidance, outbreak updates, data, vaccination information, and prevention resources.",0.0,0.0,0.0
+WHO,"WHO is a global health organization site covering international health guidance, emergencies, data, campaigns, and policy resources.",0.05713286952965648,0.17251006073708464,-0.0567413731290266
+National Geographic,"National Geographic is a science and exploration site covering nature, animals, history, travel, photography, and environment.",-0.10506087980051106,0.0,0.0
+NASA,"NASA is a space agency site for missions, astronomy, aeronautics, research, images, education, and exploration news.",0.1750447917819561,-0.036197614119391396,0.012471578340505789
+NOAA,"NOAA is a science agency site for weather, oceans, climate data, satellites, fisheries, and environmental research.",0.18361745691935644,-0.03797036052023783,0.013082362950316912
+Weather.com,"Weather.com is a weather forecasting site for local conditions, radar maps, severe alerts, climate stories, and planning.",0.0,0.0,0.0
+AllTrails,"AllTrails is an outdoor recreation site for finding hiking trails, maps, reviews, photos, and route planning.",0.20640803696590618,-0.21356526819856436,0.06919963255858623
+Strava,"Strava is a fitness tracking social network for runners, cyclists, athletes, route discovery, segments, and training analytics.",-0.10660504022982306,0.0,0.0
+Peloton,"Peloton is a fitness platform for connected exercise equipment, live classes, on demand workouts, and community challenges.",-0.1704695692377136,0.03679954506693227,-0.008505899723902588
+IKEA,"IKEA is a furniture retail site for home furnishings, room inspiration, storage solutions, delivery, and assembly services.",0.13610734039830616,-0.0010575558336161893,-0.0018571196096719724
+Home Depot,"Home Depot is a home improvement retailer for tools, building materials, appliances, garden supplies, and renovation services.",0.0,0.0,0.0
+Lowe's,"Lowe's is a home improvement retail site for hardware, appliances, flooring, outdoor products, and project guidance.",0.22324588565099496,-0.09255432751757653,-0.10026290419008708
+Sephora,"Sephora is a beauty retail site for cosmetics, skincare, fragrance, hair products, reviews, and loyalty shopping.",0.16664279552734695,-0.03597345315947155,0.00831495565340367
+Nike,"Nike is an athletic brand site for shoes, apparel, sports gear, training content, and product launches.",0.24181356557852743,-0.12270350200992236,-0.13232472736180836
+Adidas,"Adidas is a sportswear brand site for footwear, clothing, equipment, collaborations, and performance lifestyle products.",0.15354165738458303,-0.0011930207070021102,-0.002095002532530517
+Patagonia,"Patagonia is an outdoor apparel site focused on technical clothing, gear, environmental activism, and repair programs.",0.0,0.0,0.0
+The Verge,"The Verge is a technology media site covering gadgets, science, entertainment, policy, culture, and product reviews.",0.07214822146310926,0.34462628000213397,-0.17260853861403266
+TechCrunch,"TechCrunch is a technology news site focused on startups, venture capital, apps, gadgets, and industry analysis.",0.08533972581374902,0.294986857204566,-0.09723284912103297
+Ars Technica,"Ars Technica is a technology publication covering software, hardware, science, policy, security, and deep technical analysis.",0.08200658053468014,0.3917161395283035,-0.19619383175041763

@@ -62,3 +62,11 @@ Two studies:
 Three model setups compared: AUC-trained · AP-trained · AP-penalised (composite objective reduces tree count).
 
 Results are in `experiments/roc_vs_ap/outputs/report.md`.
+
+### Embedding PCA reconstruction (`experiments/embedding_pca/`)
+
+**Question**: how many PCA dimensions are needed to reproduce a medium-sized sentence embedding space for diverse website descriptions?
+
+The experiment embeds more than 100 one-sentence site descriptions with `sentence-transformers/all-MiniLM-L6-v2`, fits PCA, and reports explained variance, reconstruction error, threshold dimensions, and plots of PCA dimensions 1, 2, and 3.
+
+Run it with `make exp-embedding-pca` after installing the optional sentence embedding dependencies listed in the experiment README.
