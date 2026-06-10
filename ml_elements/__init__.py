@@ -71,6 +71,14 @@ Typical flow
 """
 
 from .analysis import Comparator
+from .embedding_pca import (
+    build_embedding_texts,
+    encode_with_sentence_transformer,
+    fit_embedding_pca,
+    load_site_descriptions,
+    plot_first_three_pcs,
+    plot_pca_variance,
+)
 from .dgp import GaussianBinaryDGP, RealDataDGP, ShiftedDGP
 from .objectives import (
     COEF_L1,
@@ -147,6 +155,13 @@ __all__ = [
     "ManualSearch",
     # Analysis
     "Comparator",
+    # Embedding PCA utilities
+    "build_embedding_texts",
+    "encode_with_sentence_transformer",
+    "fit_embedding_pca",
+    "load_site_descriptions",
+    "plot_first_three_pcs",
+    "plot_pca_variance",
     # Plots
     "plot_study",
     "plot_calibration",

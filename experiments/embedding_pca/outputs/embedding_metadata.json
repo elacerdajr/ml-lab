@@ -1,0 +1,36 @@
+{
+  "embedding_provider": "local-hashing-sentence-embedding",
+  "embedding_model": "signed token/ngram hashing fallback (384 dimensions)",
+  "preferred_embedding_provider": "sentence-transformers",
+  "preferred_embedding_model": "sentence-transformers/all-MiniLM-L6-v2",
+  "fallback_reason": "Missing runtime dependencies: numpy, pandas, sklearn, matplotlib, yaml, sentence_transformers. Install with: pip install numpy pandas scikit-learn matplotlib pyyaml sentence-transformers",
+  "normalize_embeddings": true,
+  "n_items": 129,
+  "embedding_dimension": 384,
+  "variance_thresholds": [
+    {
+      "variance_threshold": 0.8,
+      "pca_dimensions_required": 96,
+      "cumulative_explained_variance": 0.8049916998907544,
+      "relative_reconstruction_error": 0.19500830010924564
+    },
+    {
+      "variance_threshold": 0.9,
+      "pca_dimensions_required": 111,
+      "cumulative_explained_variance": 0.9030947944020263,
+      "relative_reconstruction_error": 0.09690520559797366
+    },
+    {
+      "variance_threshold": 0.95,
+      "pca_dimensions_required": 119,
+      "cumulative_explained_variance": 0.9511599731118725,
+      "relative_reconstruction_error": 0.0488400268881275
+    },
+    {
+      "variance_threshold": 0.99,
+      "pca_dimensions_required": 126,
+      "cumulative_explained_variance": 0.990187822818811,
+      "relative_reconstruction_error": 0.009812177181188986
+    }
+  ]
+}
