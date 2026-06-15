@@ -1,0 +1,705 @@
+{
+  "model_name": "RuleFit",
+  "model_type": "RuleFit",
+  "feature_names": [
+    "age",
+    "income_k",
+    "credit_score",
+    "n_transactions",
+    "is_mobile"
+  ],
+  "n_train": 2000,
+  "positive_rate": 0.042,
+  "rules": [
+    {
+      "rule_id": 1,
+      "conditions": [
+        {
+          "feature": "income_k",
+          "op": ">",
+          "value": 41.743
+        },
+        {
+          "feature": "n_transactions",
+          "op": ">",
+          "value": 10.5
+        },
+        {
+          "feature": "income_k",
+          "op": "<=",
+          "value": 43.8045
+        }
+      ],
+      "prediction": 0.375,
+      "support": 8,
+      "precision": 0.375,
+      "importance": 1.0,
+      "description": "income_k > 41.74 AND n_transactions > 10.5 AND income_k <= 43.8"
+    },
+    {
+      "rule_id": 2,
+      "conditions": [
+        {
+          "feature": "age",
+          "op": ">",
+          "value": 24.9509
+        },
+        {
+          "feature": "is_mobile",
+          "op": ">",
+          "value": 0.5
+        },
+        {
+          "feature": "n_transactions",
+          "op": ">",
+          "value": 13.5
+        },
+        {
+          "feature": "age",
+          "op": "<=",
+          "value": 48.2045
+        }
+      ],
+      "prediction": 0.3529,
+      "support": 17,
+      "precision": 0.3529,
+      "importance": 0.5452,
+      "description": "age > 24.95 AND is_mobile > 0.5 AND n_transactions > 13.5 AND age <= 48.2"
+    },
+    {
+      "rule_id": 3,
+      "conditions": [
+        {
+          "feature": "age",
+          "op": ">",
+          "value": 24.9509
+        },
+        {
+          "feature": "is_mobile",
+          "op": "<=",
+          "value": 0.5
+        }
+      ],
+      "prediction": 0.0165,
+      "support": 790,
+      "precision": 0.0165,
+      "importance": 0.4548,
+      "description": "age > 24.95 AND is_mobile <= 0.5"
+    },
+    {
+      "rule_id": 4,
+      "conditions": [
+        {
+          "feature": "income_k",
+          "op": ">",
+          "value": 103.9191
+        }
+      ],
+      "prediction": 0.0207,
+      "support": 290,
+      "precision": 0.0207,
+      "importance": 0.4469,
+      "description": "income_k > 103.9"
+    },
+    {
+      "rule_id": 5,
+      "conditions": [
+        {
+          "feature": "income_k",
+          "op": ">",
+          "value": 4.8349
+        },
+        {
+          "feature": "age",
+          "op": ">",
+          "value": 19.2256
+        }
+      ],
+      "prediction": 0.0397,
+      "support": 1963,
+      "precision": 0.0397,
+      "importance": 0.4203,
+      "description": "income_k > 4.835 AND age > 19.23"
+    },
+    {
+      "rule_id": 6,
+      "conditions": [
+        {
+          "feature": "income_k",
+          "op": "<=",
+          "value": 84.1135
+        },
+        {
+          "feature": "income_k",
+          "op": ">",
+          "value": 41.359
+        }
+      ],
+      "prediction": 0.029,
+      "support": 690,
+      "precision": 0.029,
+      "importance": 0.3909,
+      "description": "income_k <= 84.11 AND income_k > 41.36"
+    },
+    {
+      "rule_id": 7,
+      "conditions": [
+        {
+          "feature": "age",
+          "op": "<=",
+          "value": 20.8653
+        }
+      ],
+      "prediction": 0.0652,
+      "support": 92,
+      "precision": 0.0652,
+      "importance": 0.3079,
+      "description": "age <= 20.87"
+    },
+    {
+      "rule_id": 8,
+      "conditions": [
+        {
+          "feature": "age",
+          "op": "<=",
+          "value": 27.2116
+        },
+        {
+          "feature": "credit_score",
+          "op": ">",
+          "value": 771.7369
+        }
+      ],
+      "prediction": 0.098,
+      "support": 51,
+      "precision": 0.098,
+      "importance": 0.3024,
+      "description": "age <= 27.21 AND credit_score > 771.7"
+    },
+    {
+      "rule_id": 9,
+      "conditions": [
+        {
+          "feature": "age",
+          "op": ">",
+          "value": 18.5101
+        },
+        {
+          "feature": "age",
+          "op": "<=",
+          "value": 30.2486
+        },
+        {
+          "feature": "n_transactions",
+          "op": "<=",
+          "value": 10.5
+        }
+      ],
+      "prediction": 0.0531,
+      "support": 339,
+      "precision": 0.0531,
+      "importance": 0.2954,
+      "description": "age > 18.51 AND age <= 30.25 AND n_transactions <= 10.5"
+    },
+    {
+      "rule_id": 10,
+      "conditions": [
+        {
+          "feature": "age",
+          "op": ">",
+          "value": 23.9045
+        },
+        {
+          "feature": "age",
+          "op": "<=",
+          "value": 30.2486
+        },
+        {
+          "feature": "n_transactions",
+          "op": ">",
+          "value": 10.5
+        },
+        {
+          "feature": "income_k",
+          "op": "<=",
+          "value": 75.268
+        }
+      ],
+      "prediction": 0.2308,
+      "support": 39,
+      "precision": 0.2308,
+      "importance": 0.2911,
+      "description": "age > 23.9 AND age <= 30.25 AND n_transactions > 10.5 AND income_k <= 75.27"
+    },
+    {
+      "rule_id": 11,
+      "conditions": [
+        {
+          "feature": "credit_score",
+          "op": ">",
+          "value": 682.7436
+        }
+      ],
+      "prediction": 0.0283,
+      "support": 990,
+      "precision": 0.0283,
+      "importance": 0.2639,
+      "description": "credit_score > 682.7"
+    },
+    {
+      "rule_id": 12,
+      "conditions": [
+        {
+          "feature": "credit_score",
+          "op": ">",
+          "value": 709.2144
+        }
+      ],
+      "prediction": 0.0236,
+      "support": 763,
+      "precision": 0.0236,
+      "importance": 0.2309,
+      "description": "credit_score > 709.2"
+    },
+    {
+      "rule_id": 13,
+      "conditions": [
+        {
+          "feature": "age",
+          "op": ">",
+          "value": 46.0796
+        }
+      ],
+      "prediction": 0.0208,
+      "support": 1009,
+      "precision": 0.0208,
+      "importance": 0.1916,
+      "description": "age > 46.08"
+    },
+    {
+      "rule_id": 14,
+      "conditions": [
+        {
+          "feature": "age",
+          "op": ">",
+          "value": 27.2823
+        }
+      ],
+      "prediction": 0.0335,
+      "support": 1674,
+      "precision": 0.0335,
+      "importance": 0.1651,
+      "description": "age > 27.28"
+    },
+    {
+      "rule_id": 15,
+      "conditions": [
+        {
+          "feature": "age",
+          "op": "<=",
+          "value": 25.4731
+        }
+      ],
+      "prediction": 0.0748,
+      "support": 254,
+      "precision": 0.0748,
+      "importance": 0.1323,
+      "description": "age <= 25.47"
+    },
+    {
+      "rule_id": 16,
+      "conditions": [
+        {
+          "feature": "n_transactions",
+          "op": ">",
+          "value": 13.5
+        },
+        {
+          "feature": "income_k",
+          "op": "<=",
+          "value": 41.8758
+        }
+      ],
+      "prediction": 0.1667,
+      "support": 36,
+      "precision": 0.1667,
+      "importance": 0.1274,
+      "description": "n_transactions > 13.5 AND income_k <= 41.88"
+    },
+    {
+      "rule_id": 17,
+      "conditions": [
+        {
+          "feature": "credit_score",
+          "op": "<=",
+          "value": 665.7065
+        }
+      ],
+      "prediction": 0.0481,
+      "support": 853,
+      "precision": 0.0481,
+      "importance": 0.1244,
+      "description": "credit_score <= 665.7"
+    },
+    {
+      "rule_id": 18,
+      "conditions": [
+        {
+          "feature": "age",
+          "op": ">",
+          "value": 32.8943
+        }
+      ],
+      "prediction": 0.0279,
+      "support": 1467,
+      "precision": 0.0279,
+      "importance": 0.1236,
+      "description": "age > 32.89"
+    },
+    {
+      "rule_id": 19,
+      "conditions": [
+        {
+          "feature": "age",
+          "op": ">",
+          "value": 32.4372
+        }
+      ],
+      "prediction": 0.0283,
+      "support": 1482,
+      "precision": 0.0283,
+      "importance": 0.1189,
+      "description": "age > 32.44"
+    },
+    {
+      "rule_id": 20,
+      "conditions": [
+        {
+          "feature": "age",
+          "op": ">",
+          "value": 50.0553
+        }
+      ],
+      "prediction": 0.0194,
+      "support": 878,
+      "precision": 0.0194,
+      "importance": 0.1185,
+      "description": "age > 50.06"
+    },
+    {
+      "rule_id": 21,
+      "conditions": [
+        {
+          "feature": "income_k",
+          "op": "<=",
+          "value": 38.5164
+        }
+      ],
+      "prediction": 0.0495,
+      "support": 829,
+      "precision": 0.0495,
+      "importance": 0.1088,
+      "description": "income_k <= 38.52"
+    },
+    {
+      "rule_id": 22,
+      "conditions": [
+        {
+          "feature": "age",
+          "op": "<=",
+          "value": 24.8379
+        },
+        {
+          "feature": "n_transactions",
+          "op": ">",
+          "value": 7.5
+        },
+        {
+          "feature": "income_k",
+          "op": "<=",
+          "value": 42.4726
+        },
+        {
+          "feature": "income_k",
+          "op": ">",
+          "value": 33.5678
+        }
+      ],
+      "prediction": 0.2143,
+      "support": 14,
+      "precision": 0.2143,
+      "importance": 0.0995,
+      "description": "age <= 24.84 AND n_transactions > 7.5 AND income_k <= 42.47 AND income_k > 33.57"
+    },
+    {
+      "rule_id": 23,
+      "conditions": [
+        {
+          "feature": "age",
+          "op": "<=",
+          "value": 32.8943
+        }
+      ],
+      "prediction": 0.0807,
+      "support": 533,
+      "precision": 0.0807,
+      "importance": 0.0961,
+      "description": "age <= 32.89"
+    },
+    {
+      "rule_id": 24,
+      "conditions": [
+        {
+          "feature": "age",
+          "op": ">",
+          "value": 18.1579
+        },
+        {
+          "feature": "income_k",
+          "op": ">",
+          "value": 51.3984
+        }
+      ],
+      "prediction": 0.0355,
+      "support": 874,
+      "precision": 0.0355,
+      "importance": 0.0884,
+      "description": "age > 18.16 AND income_k > 51.4"
+    },
+    {
+      "rule_id": 25,
+      "conditions": [
+        {
+          "feature": "credit_score",
+          "op": ">",
+          "value": 665.7065
+        }
+      ],
+      "prediction": 0.0375,
+      "support": 1147,
+      "precision": 0.0375,
+      "importance": 0.078,
+      "description": "credit_score > 665.7"
+    },
+    {
+      "rule_id": 26,
+      "conditions": [
+        {
+          "feature": "income_k",
+          "op": ">",
+          "value": 84.7395
+        },
+        {
+          "feature": "income_k",
+          "op": "<=",
+          "value": 97.618
+        }
+      ],
+      "prediction": 0.0909,
+      "support": 88,
+      "precision": 0.0909,
+      "importance": 0.0606,
+      "description": "income_k > 84.74 AND income_k <= 97.62"
+    },
+    {
+      "rule_id": 27,
+      "conditions": [
+        {
+          "feature": "n_transactions",
+          "op": "<=",
+          "value": 14.5
+        },
+        {
+          "feature": "age",
+          "op": "<=",
+          "value": 39.2061
+        },
+        {
+          "feature": "age",
+          "op": ">",
+          "value": 21.4626
+        }
+      ],
+      "prediction": 0.0618,
+      "support": 599,
+      "precision": 0.0618,
+      "importance": 0.0497,
+      "description": "n_transactions <= 14.5 AND age <= 39.21 AND age > 21.46"
+    },
+    {
+      "rule_id": 28,
+      "conditions": [
+        {
+          "feature": "n_transactions",
+          "op": ">",
+          "value": 13.5
+        },
+        {
+          "feature": "income_k",
+          "op": ">",
+          "value": 41.8758
+        }
+      ],
+      "prediction": 0.0244,
+      "support": 41,
+      "precision": 0.0244,
+      "importance": 0.0304,
+      "description": "n_transactions > 13.5 AND income_k > 41.88"
+    },
+    {
+      "rule_id": 29,
+      "conditions": [
+        {
+          "feature": "age",
+          "op": "<=",
+          "value": 46.0796
+        }
+      ],
+      "prediction": 0.0636,
+      "support": 991,
+      "precision": 0.0636,
+      "importance": 0.0274,
+      "description": "age <= 46.08"
+    },
+    {
+      "rule_id": 30,
+      "conditions": [
+        {
+          "feature": "age",
+          "op": "<=",
+          "value": 24.8379
+        },
+        {
+          "feature": "n_transactions",
+          "op": ">",
+          "value": 7.5
+        },
+        {
+          "feature": "income_k",
+          "op": "<=",
+          "value": 33.5678
+        }
+      ],
+      "prediction": 0.0541,
+      "support": 37,
+      "precision": 0.0541,
+      "importance": 0.0272,
+      "description": "age <= 24.84 AND n_transactions > 7.5 AND income_k <= 33.57"
+    },
+    {
+      "rule_id": 31,
+      "conditions": [
+        {
+          "feature": "n_transactions",
+          "op": "<=",
+          "value": 16.5
+        },
+        {
+          "feature": "age",
+          "op": ">",
+          "value": 39.3966
+        }
+      ],
+      "prediction": 0.0279,
+      "support": 1255,
+      "precision": 0.0279,
+      "importance": 0.0267,
+      "description": "n_transactions <= 16.5 AND age > 39.4"
+    },
+    {
+      "rule_id": 32,
+      "conditions": [
+        {
+          "feature": "income_k",
+          "op": ">",
+          "value": 5.5857
+        },
+        {
+          "feature": "n_transactions",
+          "op": ">",
+          "value": 10.5
+        },
+        {
+          "feature": "income_k",
+          "op": "<=",
+          "value": 41.743
+        },
+        {
+          "feature": "credit_score",
+          "op": ">",
+          "value": 568.2577
+        }
+      ],
+      "prediction": 0.0738,
+      "support": 149,
+      "precision": 0.0738,
+      "importance": 0.016,
+      "description": "income_k > 5.586 AND n_transactions > 10.5 AND income_k <= 41.74 AND credit_score > 568.3"
+    },
+    {
+      "rule_id": 33,
+      "conditions": [
+        {
+          "feature": "age",
+          "op": "<=",
+          "value": 24.8379
+        },
+        {
+          "feature": "n_transactions",
+          "op": "<=",
+          "value": 7.5
+        }
+      ],
+      "prediction": 0.0636,
+      "support": 110,
+      "precision": 0.0636,
+      "importance": 0.0056,
+      "description": "age <= 24.84 AND n_transactions <= 7.5"
+    },
+    {
+      "rule_id": 34,
+      "conditions": [
+        {
+          "feature": "age",
+          "op": "<=",
+          "value": 50.0553
+        }
+      ],
+      "prediction": 0.0597,
+      "support": 1122,
+      "precision": 0.0597,
+      "importance": 0.0037,
+      "description": "age <= 50.06"
+    },
+    {
+      "rule_id": 35,
+      "conditions": [
+        {
+          "feature": "credit_score",
+          "op": "<=",
+          "value": 682.7436
+        }
+      ],
+      "prediction": 0.0554,
+      "support": 1010,
+      "precision": 0.0554,
+      "importance": 0.0024,
+      "description": "credit_score <= 682.7"
+    },
+    {
+      "rule_id": 36,
+      "conditions": [
+        {
+          "feature": "credit_score",
+          "op": "<=",
+          "value": 709.2144
+        }
+      ],
+      "prediction": 0.0534,
+      "support": 1237,
+      "precision": 0.0534,
+      "importance": 0.0004,
+      "description": "credit_score <= 709.2"
+    }
+  ]
+}

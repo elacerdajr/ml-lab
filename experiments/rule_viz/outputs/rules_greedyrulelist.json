@@ -1,0 +1,75 @@
+{
+  "model_name": "GreedyRuleList",
+  "model_type": "GreedyRuleList",
+  "feature_names": [
+    "age",
+    "income_k",
+    "credit_score",
+    "n_transactions",
+    "is_mobile"
+  ],
+  "n_train": 2000,
+  "positive_rate": 0.042,
+  "rules": [
+    {
+      "rule_id": 1,
+      "conditions": [
+        {
+          "feature": "age",
+          "op": ">",
+          "value": 32.744
+        }
+      ],
+      "prediction": 0.0813,
+      "support": 1471,
+      "precision": 0.0279,
+      "importance": 1.0,
+      "description": "age > 32.74"
+    },
+    {
+      "rule_id": 2,
+      "conditions": [
+        {
+          "feature": "is_mobile",
+          "op": "<=",
+          "value": 0.5
+        }
+      ],
+      "prediction": 0.0407,
+      "support": 234,
+      "precision": 0.0598,
+      "importance": 0.2008,
+      "description": "is_mobile <= 0.5"
+    },
+    {
+      "rule_id": 3,
+      "conditions": [
+        {
+          "feature": "credit_score",
+          "op": ">",
+          "value": 581.4445
+        }
+      ],
+      "prediction": 0.0465,
+      "support": 257,
+      "precision": 0.0895,
+      "importance": 0.5873,
+      "description": "credit_score > 581.4"
+    },
+    {
+      "rule_id": 4,
+      "conditions": [
+        {
+          "feature": "income_k",
+          "op": "<=",
+          "value": 88.1348
+        }
+      ],
+      "prediction": 0.0342,
+      "support": 34,
+      "precision": 0.1765,
+      "importance": 0.22,
+      "description": "income_k <= 88.13"
+    }
+  ]
+}

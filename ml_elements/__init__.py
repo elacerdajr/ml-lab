@@ -71,6 +71,8 @@ Typical flow
 """
 
 from .analysis import Comparator
+from .rules import RuleCondition, Rule, RuleSet, RuleExtractor
+from .rule_viz import rule_matrix_html, save_rule_report
 from .embedding_pca import (
     build_embedding_texts,
     encode_with_sentence_transformer,
@@ -155,6 +157,13 @@ __all__ = [
     "ManualSearch",
     # Analysis
     "Comparator",
+    # Rule extraction and visualization
+    "RuleCondition",
+    "Rule",
+    "RuleSet",
+    "RuleExtractor",
+    "rule_matrix_html",
+    "save_rule_report",
     # Embedding PCA utilities
     "build_embedding_texts",
     "encode_with_sentence_transformer",
