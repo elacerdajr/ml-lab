@@ -1,4 +1,4 @@
-.PHONY: exp-roc-vs-ap exp-roc-vs-ap-imbalance exp-roc-vs-ap-info exp-embedding-pca
+.PHONY: exp-roc-vs-ap exp-roc-vs-ap-imbalance exp-roc-vs-ap-info exp-embedding-pca exp-rule-viz
 
 exp-roc-vs-ap:  ## Run both studies (full experiment)
 	cd experiments/roc_vs_ap && python run_experiment.py
@@ -11,3 +11,6 @@ exp-roc-vs-ap-info:  ## Run Study 2 only: feature information sweep
 
 exp-embedding-pca:  ## Run sentence embedding PCA reconstruction experiment
 	cd experiments/embedding_pca && python run_experiment.py
+
+exp-rule-viz:  ## Train interpretable models, extract rules, build interactive D3 HTML report
+	cd experiments/rule_viz && python run_experiment.py

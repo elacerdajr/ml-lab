@@ -1,0 +1,17 @@
+[
+  {
+    "model": "DecisionTree",
+    "test_auc": 0.6256,
+    "n_rules": 15
+  },
+  {
+    "model": "RuleFit",
+    "test_auc": 0.6669,
+    "n_rules": 36
+  },
+  {
+    "model": "GreedyRuleList",
+    "test_auc": 0.6169,
+    "n_rules": 4
+  }
+]
