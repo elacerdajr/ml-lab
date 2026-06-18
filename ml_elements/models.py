@@ -33,6 +33,7 @@ from typing import Any, Callable
 
 from sklearn.ensemble import HistGradientBoostingClassifier
 from sklearn.linear_model import LogisticRegression
+from sklearn.tree import DecisionTreeClassifier
 
 from .protocols import ModelBackend
 
@@ -177,6 +178,196 @@ def make_catboost(
         )
 
     factory.__name__ = "make_catboost"
+    return factory
+
+
+def make_decision_tree(
+    max_depth: int = 4,
+    min_samples_leaf: int = 20,
+    random_state: int = _DEFAULT_RANDOM_STATE,
+    **kwargs: Any,
+) -> Callable[[], ModelBackend]:
+    """
+    Factory for sklearn's ``DecisionTreeClassifier``.
+
+    Used as a small, interpretable baseline against the more elaborate
+    ``imodels`` estimators.
+
+    Parameters
+    ----------
+    max_depth : int
+        Maximum tree depth.
+    min_samples_leaf : int
+        Minimum number of samples per leaf.
+    random_state : int
+        Reproducibility seed.
+    **kwargs
+        Forwarded to ``DecisionTreeClassifier``.
+
+    Returns
+    -------
+    Callable[[], ModelBackend]
+    """
+    def factory() -> ModelBackend:
+        return DecisionTreeClassifier(
+            max_depth=max_depth,
+            min_samples_leaf=min_samples_leaf,
+            random_state=random_state,
+            **kwargs,
+        )
+
+    factory.__name__ = "make_decision_tree"
+    return factory
+
+
+def make_figs(
+    max_rules: int = 25,
+    random_state: int = _DEFAULT_RANDOM_STATE,
+    **kwargs: Any,
+) -> Callable[[], ModelBackend]:
+    """
+    Factory for ``imodels.FIGSClassifier`` (Fast Interpretable Greedy-tree Sums).
+
+    Requires ``pip install imodels``. Import is deferred so the rest of the
+    package works without ``imodels`` installed.
+
+    Parameters
+    ----------
+    max_rules : int
+        Upper bound on the total number of rules (leaves across all trees).
+        Controls the capacity of the additive tree-sum model.
+    random_state : int
+        Reproducibility seed.
+    **kwargs
+        Forwarded to ``FIGSClassifier``.
+
+    Returns
+    -------
+    Callable[[], ModelBackend]
+
+    Raises
+    ------
+    ImportError
+        If ``imodels`` is not installed.
+    """
+    def factory() -> ModelBackend:
+        try:
+            from imodels import FIGSClassifier
+        except ImportError as exc:
+            raise ImportError(
+                "make_figs requires imodels. Install with: pip install imodels"
+            ) from exc
+
+        return FIGSClassifier(
+            max_rules=max_rules,
+            random_state=random_state,
+            **kwargs,
+        )
+
+    factory.__name__ = "make_figs"
+    return factory
+
+
+def make_greedy_rule_list(
+    max_depth: int = 8,
+    **kwargs: Any,
+) -> Callable[[], ModelBackend]:
+    """
+    Factory for ``imodels.GreedyRuleListClassifier``.
+
+    An ordered if-then-else list of thresholds learned greedily. Highly
+    interpretable but structurally limited (single chain of rules).
+
+    Requires ``pip install imodels``.
+
+    Parameters
+    ----------
+    max_depth : int
+        Maximum length of the rule list.
+    **kwargs
+        Forwarded to ``GreedyRuleListClassifier``.
+
+    Returns
+    -------
+    Callable[[], ModelBackend]
+
+    Raises
+    ------
+    ImportError
+        If ``imodels`` is not installed.
+    """
+    def factory() -> ModelBackend:
+        try:
+            from imodels import GreedyRuleListClassifier
+        except ImportError as exc:
+            raise ImportError(
+                "make_greedy_rule_list requires imodels. "
+                "Install with: pip install imodels"
+            ) from exc
+
+        return GreedyRuleListClassifier(
+            max_depth=max_depth,
+            **kwargs,
+        )
+
+    factory.__name__ = "make_greedy_rule_list"
+    return factory
+
+
+def make_rule_fit(
+    n_estimators: int = 40,
+    tree_size: int = 4,
+    max_rules: int = 40,
+    random_state: int = _DEFAULT_RANDOM_STATE,
+    **kwargs: Any,
+) -> Callable[[], ModelBackend]:
+    """
+    Factory for ``imodels.RuleFitClassifier``.
+
+    Sparse linear ensemble of rules generated from trees. Slower than FIGS
+    and the greedy rule list but produces an L1-regularised rule set.
+
+    Requires ``pip install imodels``.
+
+    Parameters
+    ----------
+    n_estimators : int
+        Number of tree generators.
+    tree_size : int
+        Average number of leaves per tree used for rule generation.
+    max_rules : int
+        Approximate cap on extracted rules.
+    random_state : int
+        Reproducibility seed.
+    **kwargs
+        Forwarded to ``RuleFitClassifier``.
+
+    Returns
+    -------
+    Callable[[], ModelBackend]
+
+    Raises
+    ------
+    ImportError
+        If ``imodels`` is not installed.
+    """
+    def factory() -> ModelBackend:
+        try:
+            from imodels import RuleFitClassifier
+        except ImportError as exc:
+            raise ImportError(
+                "make_rule_fit requires imodels. Install with: pip install imodels"
+            ) from exc
+
+        return RuleFitClassifier(
+            n_estimators=n_estimators,
+            tree_size=tree_size,
+            max_rules=max_rules,
+            random_state=random_state,
+            **kwargs,
+        )
+
+    factory.__name__ = "make_rule_fit"
     return factory
 
 

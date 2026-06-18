@@ -95,11 +95,21 @@ from .metrics import (
     AVG_PRECISION,
     AVG_PRECISION_SMOOTH,
     AUC,
+    BRIER,
     LOGLOSS,
     Metric,
     make_smooth_ap,
 )
-from .models import make_catboost, make_hgb, make_logistic, make_sklearn
+from .models import (
+    make_catboost,
+    make_decision_tree,
+    make_figs,
+    make_greedy_rule_list,
+    make_hgb,
+    make_logistic,
+    make_rule_fit,
+    make_sklearn,
+)
 from .plots import (
     plot_calibration,
     plot_feature_importance,
@@ -126,6 +136,10 @@ __all__ = [
     "make_logistic",
     "make_hgb",
     "make_catboost",
+    "make_decision_tree",
+    "make_figs",
+    "make_greedy_rule_list",
+    "make_rule_fit",
     "make_sklearn",
     # Objectives
     "Objective",
@@ -138,6 +152,7 @@ __all__ = [
     "Metric",
     "AUC",
     "LOGLOSS",
+    "BRIER",
     "AVG_PRECISION",
     "AVG_PRECISION_SMOOTH",
     "ALL_METRICS",

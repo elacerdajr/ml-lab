@@ -32,7 +32,7 @@ from dataclasses import dataclass
 from typing import Callable, Literal
 
 import numpy as np
-from sklearn.metrics import average_precision_score, log_loss, roc_auc_score
+from sklearn.metrics import average_precision_score, brier_score_loss, log_loss, roc_auc_score
 
 from .protocols import MetricFn
 
@@ -254,10 +254,16 @@ AVG_PRECISION: Metric = Metric(
     fn=lambda y, p: average_precision_score(y, p),
 )
 
+BRIER: Metric = Metric(
+    name="brier_score",
+    direction="lower",
+    fn=lambda y, p: brier_score_loss(y, p),
+)
+
 AVG_PRECISION_SMOOTH: Metric = make_smooth_ap(prior_mean=0.1, prior_strength=20)
 
 
 ALL_METRICS: dict[str, Metric] = {
     m.name: m
-    for m in [AUC, LOGLOSS, AVG_PRECISION, AVG_PRECISION_SMOOTH]
+    for m in [AUC, LOGLOSS, AVG_PRECISION, BRIER, AVG_PRECISION_SMOOTH]
 }

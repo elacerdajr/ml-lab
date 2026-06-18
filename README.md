@@ -28,9 +28,10 @@ Any piece can be swapped independently — different model, different DGP, diffe
 ## Running an experiment
 
 ```bash
-# install dependencies
-pip install numpy pandas scikit-learn matplotlib scipy
-# optional: pip install catboost joblib rich
+# install dependencies (uses uv; see pyproject.toml for the full set)
+uv sync                         # core deps only
+uv sync --extra all             # + catboost, imodels, joblib/rich, embeddings
+uv sync --extra imodels         # cherry-pick just the extras you need
 
 # run the ROC-AUC vs Average Precision experiment
 make exp-roc-vs-ap
@@ -39,6 +40,10 @@ make exp-roc-vs-ap
 make exp-roc-vs-ap-imbalance   # class imbalance sweep
 make exp-roc-vs-ap-info        # feature information sweep
 ```
+
+> All commands should be run through `uv run` (e.g. `uv run python ...`) or
+> inside the `.venv` that `uv sync` creates — this guarantees the exact
+> locked dependency set recorded in `uv.lock`.
 
 Outputs land in `experiments/roc_vs_ap/outputs/`.
 
