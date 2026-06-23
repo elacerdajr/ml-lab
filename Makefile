@@ -1,4 +1,4 @@
-.PHONY: exp-roc-vs-ap exp-roc-vs-ap-imbalance exp-roc-vs-ap-info exp-embedding-pca exp-rule-viz exp-weak-features
+.PHONY: exp-roc-vs-ap exp-roc-vs-ap-imbalance exp-roc-vs-ap-info exp-embedding-pca exp-rule-viz exp-weak-features exp-weak-features-beta
 
 # Run every experiment through `uv run` so it always uses the locked
 # environment from uv.lock. Override with `PYTHON=` if you want to bypass.
@@ -21,3 +21,6 @@ exp-rule-viz:  ## Train interpretable models, extract rules, build interactive D
 
 exp-weak-features:  ## Sweep training size with 100 weak features; compare CatBoost vs FIGS / Greedy / DecisionTree
 	cd experiments/weak_features_sample_size && $(PYTHON) run_experiment.py
+
+exp-weak-features-beta:  ## Same as exp-weak-features but info_j ~ Beta(1,9) instead of constant 0.10
+	cd experiments/weak_features_beta && $(PYTHON) run_experiment.py

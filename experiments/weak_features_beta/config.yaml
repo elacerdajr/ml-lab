@@ -1,0 +1,102 @@
+# experiments/weak_features_beta/config.yaml
+# ──────────────────────────────────────────────────
+# Shared settings for the "100 features, Beta(1,9) info × sample size" experiment.
+# Features receive heterogeneous information levels sampled from Beta(1,9)
+# (mean = 0.10, same as weak_features_sample_size, but strongly right‑skewed).
+# Only the train size is swept (see run_experiment.py); everything else
+# is fixed here so the comparison across models is clean.
+
+experiment:
+  name: weak_features_beta
+  description: >
+    Compare CatBoost, HistGradientBoosting, and interpretable rule/tree
+    models (FIGS, GreedyRuleList, plain DecisionTree) when the feature
+    set is heterogeneous: 100 features with information levels sampled
+    from Beta(1,9). Same mean strength as the homogeneous experiment
+    (0.10) but most features are near‑zero and a few carry notable signal.
+    The sweep varies the training size against a large OOS test set.
+
+# ── Sweep axis ────────────────────────────────────────────────────────────
+sweep:
+  trial_name: n_train
+  values: [200, 500, 1000, 2000, 5000, 10000]
+
+# ── Data budget ───────────────────────────────────────────────────────────
+# n_test is large so OOS metric estimates are essentially noise‑free.
+# n_repeats gives independent test draws per (model, n_train).
+data:
+  n_test: 50000
+  n_repeats: 30
+  n_valid: 1000
+  seeds:
+    train: 101
+    valid: 202
+    test_base: 10000
+
+# ── DGP ───────────────────────────────────────────────────────────────────
+# 100 features, each receiving an independent draw from Beta(a=1, b=9).
+# The info levels are sampled once with a fixed seed so the DGP is
+# deterministic across the experiment.
+dgp:
+  p_pos: 0.01
+  sigma: 1.0
+  n_features: 100
+  info_dist:
+    family: beta
+    a: 10.0
+    b: 90.0
+    seed: 20250601
+
+# ── Models ────────────────────────────────────────────────────────────────
+models:
+  logistic:
+    label: "LogisticRegression"
+    factory: make_logistic
+
+  catboost:
+    label: "CatBoost"
+    factory: make_catboost
+    params:
+      iterations: 400
+      depth: 4
+      learning_rate: 0.05
+
+  hgb:
+    label: "HistGradientBoosting"
+    factory: make_hgb
+    params:
+      iterations: 400
+      learning_rate: 0.05
+      max_leaf_nodes: 16
+
+  decision_tree:
+    label: "DecisionTree (depth=4)"
+    factory: make_decision_tree
+    params:
+      max_depth: 4
+      min_samples_leaf: 20
+
+  figs:
+    label: "FIGS (max_rules=25)"
+    factory: make_figs
+    params:
+      max_rules: 25
+
+  greedy:
+    label: "GreedyRuleList (depth=8)"
+    factory: make_greedy_rule_list
+    params:
+      max_depth: 8
+
+# ── Metrics ───────────────────────────────────────────────────────────────
+metrics:
+  - roc_auc
+  - average_precision
+  - brier_score
+
+# ── Reference & comparator ────────────────────────────────────────────────
+reference_setup: logistic
+gap_baseline: catboost
+
+outputs:
+  dir: outputs

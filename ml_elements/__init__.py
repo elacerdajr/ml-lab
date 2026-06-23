@@ -81,6 +81,7 @@ from .embedding_pca import (
     plot_first_three_pcs,
     plot_pca_variance,
 )
+from .rich_logger import RichLogger
 from .dgp import GaussianBinaryDGP, RealDataDGP, ShiftedDGP
 from .objectives import (
     COEF_L1,
@@ -124,6 +125,8 @@ from .study import Study, StudyResult
 from .trial import DataBudget, Trial
 
 __all__ = [
+    # Logger
+    "RichLogger",
     # Protocols
     "DGP",
     "ModelBackend",
