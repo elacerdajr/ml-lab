@@ -23,6 +23,7 @@ for weak features than for strong ones.
 Outputs (experiments/noisy_label_catboost/outputs/):
   results.csv
   soft_target_distribution.png
+  score_distribution.png
   metric_comparison.png
   calibration_curves.png
   feature_importance.png
@@ -162,6 +163,41 @@ def _plot_soft_distribution(dist_by_noise: dict[float, tuple[np.ndarray, np.ndar
     fig.suptitle("Soft-target distribution across noise levels", fontsize=11, y=1.02)
     fig.tight_layout()
     path = OUT_DIR / "soft_target_distribution.png"
+    fig.savefig(path, dpi=130, bbox_inches="tight")
+    plt.close(fig)
+    log.info("saved %s", path.name)
+
+
+def _plot_score_distribution(
+    hard_scores: np.ndarray,
+    y_test: np.ndarray,
+    test_score_by_noise: dict[float, np.ndarray],
+) -> None:
+    noise_levels = list(test_score_by_noise.keys())
+    n = 1 + len(noise_levels)
+    fig, axes = plt.subplots(1, n, figsize=(3.6 * n, 4), sharey=False)
+
+    panels = [("hard (Logloss)", hard_scores)] + [
+        (f"soft noise_max={noise:.2f}", test_score_by_noise[noise]) for noise in noise_levels
+    ]
+
+    for ax, (title, scores) in zip(axes, panels):
+        pos = scores[y_test == 1]
+        neg = scores[y_test == 0]
+
+        ax.hist(neg, bins=30, alpha=0.6, color="#4477bb", label="neg (y=0)", density=True)
+        ax.hist(pos, bins=30, alpha=0.6, color="#cc4444", label="pos (y=1)", density=True)
+        ax.axvline(0.5, color="black", linestyle=":", linewidth=1.0)
+        ax.set_title(title, fontsize=10)
+        ax.set_xlabel("predicted P(y=1)", fontsize=9)
+        ax.set_xlim(0, 1)
+        ax.grid(axis="y", alpha=0.3, linestyle=":")
+        if ax is axes[0]:
+            ax.legend(fontsize=8)
+
+    fig.suptitle("Predicted score distribution on test set — hard vs soft models per noise level", fontsize=11, y=1.02)
+    fig.tight_layout()
+    path = OUT_DIR / "score_distribution.png"
     fig.savefig(path, dpi=130, bbox_inches="tight")
     plt.close(fig)
     log.info("saved %s", path.name)
@@ -428,6 +464,15 @@ def _write_report(rows: list[dict], hard_metrics: dict, img_prefix: str = "outpu
         "",
         f"![soft target distribution]({img_prefix}soft_target_distribution.png)",
         "",
+        "### Predicted score distributions (test set)",
+        "",
+        "Histogram of each model's predicted P(y=1) on the held-out test set, split by the true",
+        "hard label, for the hard baseline and every soft noise level. Unlike the panel above (which",
+        "shows the noisy *training* targets), this shows what the model actually outputs — the",
+        "pos/neg histograms visibly move closer together as noise_max grows.",
+        "",
+        f"![score distribution]({img_prefix}score_distribution.png)",
+        "",
         "### Metric comparison",
         "",
         "Bar chart of AP / AUC / Brier for the soft (CrossEntropy) model at each noise level,",
@@ -588,6 +633,7 @@ def main() -> None:
     feature_names = list(FEATURE_INFO.keys())
 
     _plot_soft_distribution(dist_by_noise)
+    _plot_score_distribution(hard_scores, y_test, test_score_by_noise)
     _plot_metric_comparison(rows, hard_metrics)
     _plot_calibration(hard_scores, y_test, test_score_by_noise)
     _plot_feature_importance(hard_model, soft_models, feature_names)

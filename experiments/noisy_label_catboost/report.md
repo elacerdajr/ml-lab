@@ -50,6 +50,15 @@ that `y_soft` never crosses 0.5 — the noise corrupts confidence, not the class
 
 ![soft target distribution](outputs/soft_target_distribution.png)
 
+### Predicted score distributions (test set)
+
+Histogram of each model's predicted P(y=1) on the held-out test set, split by the true
+hard label, for the hard baseline and every soft noise level. Unlike the panel above (which
+shows the noisy *training* targets), this shows what the model actually outputs — the
+pos/neg histograms visibly move closer together as noise_max grows.
+
+![score distribution](outputs/score_distribution.png)
+
 ### Metric comparison
 
 Bar chart of AP / AUC / Brier for the soft (CrossEntropy) model at each noise level,
