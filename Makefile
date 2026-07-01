@@ -1,4 +1,4 @@
-.PHONY: exp-roc-vs-ap exp-roc-vs-ap-imbalance exp-roc-vs-ap-info exp-embedding-pca exp-rule-viz exp-weak-features exp-weak-features-beta
+.PHONY: exp-roc-vs-ap exp-roc-vs-ap-imbalance exp-roc-vs-ap-info exp-embedding-pca exp-rule-viz exp-weak-features exp-weak-features-beta exp-noisy-label-catboost
 
 # Run every experiment through `uv run` so it always uses the locked
 # environment from uv.lock. Override with `PYTHON=` if you want to bypass.
@@ -24,3 +24,6 @@ exp-weak-features:  ## Sweep training size with 100 weak features; compare CatBo
 
 exp-weak-features-beta:  ## Same as exp-weak-features but info_j ~ Beta(1,9) instead of constant 0.10
 	cd experiments/weak_features_beta && $(PYTHON) run_experiment.py
+
+exp-noisy-label-catboost:  ## CatBoost CrossEntropy on noisy soft labels vs Logloss on hard labels, across noise levels
+	cd experiments/noisy_label_catboost && $(PYTHON) run_experiment.py
