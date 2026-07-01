@@ -48,14 +48,14 @@ AP = 0.8510  ·  AUC = 0.9072  ·  Brier = 0.1154
 Histogram of `y_soft` for positives (red) and negatives (blue) across noise levels. Note
 that `y_soft` never crosses 0.5 — the noise corrupts confidence, not the class sign.
 
-![soft target distribution](outputs/soft_target_distribution.png)
+![soft target distribution](soft_target_distribution.png)
 
 ### Metric comparison
 
 Bar chart of AP / AUC / Brier for the soft (CrossEntropy) model at each noise level,
 against the hard (Logloss) baseline (dashed line).
 
-![metric comparison](outputs/metric_comparison.png)
+![metric comparison](metric_comparison.png)
 
 ### Calibration curves
 
@@ -63,7 +63,7 @@ Reliability diagram (10 quantile bins) on the test set. The hard-label model tra
 diagonal; soft-label curves flatten toward the middle as `noise_max` grows — a direct
 picture of the calibration compression quantified by the Brier column above.
 
-![calibration curves](outputs/calibration_curves.png)
+![calibration curves](calibration_curves.png)
 
 ### Feature importance
 
@@ -71,7 +71,7 @@ CatBoost `PredictionValuesChange` importance per feature, hard model vs each sof
 If CrossEntropy training on noisy targets is behaving sensibly, the ranking of features by
 importance should stay stable across noise levels even as absolute magnitudes shift.
 
-![feature importance](outputs/feature_importance.png)
+![feature importance](feature_importance.png)
 
 ### Decision surface
 
@@ -79,7 +79,7 @@ Predicted P(y=1) over the (x1, x2) plane — the two strongest-information featu
 x3-x5 fixed at their training mean. 400 training points overlaid (red=pos, blue=neg). Shows
 whether the learned boundary itself shifts with noise, independent of the ranking metrics.
 
-![decision boundary](outputs/decision_boundary.png)
+![decision boundary](decision_boundary.png)
 
 ### UMAP — raw features
 
@@ -87,7 +87,7 @@ UMAP of the 5 raw features (fit once). Left panel: hard binary labels. Remaining
 panels: predicted probability from the CrossEntropy soft model trained at each noise
 level, evaluated on the same training points.
 
-![umap hard vs scores](outputs/umap_hard_vs_scores.png)
+![umap hard vs scores](umap_hard_vs_scores.png)
 
 ---
 

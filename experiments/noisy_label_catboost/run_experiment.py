@@ -24,7 +24,11 @@ Outputs (experiments/noisy_label_catboost/outputs/):
   results.csv
   soft_target_distribution.png
   metric_comparison.png
+  calibration_curves.png
+  feature_importance.png
+  decision_boundary.png
   umap_hard_vs_scores.png   (only if umap-learn installed)
+  README.md                 (this experiment's report, self-contained for the outputs folder)
 """
 
 from __future__ import annotations
@@ -39,6 +43,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from sklearn.calibration import calibration_curve
 from sklearn.metrics import average_precision_score, brier_score_loss, roc_auc_score
 
 SCRIPT_DIR = Path(__file__).parent
@@ -237,9 +242,128 @@ def _plot_umap_grid(
     log.info("saved %s", path.name)
 
 
-def _write_report(rows: list[dict], hard_metrics: dict) -> None:
+def _plot_calibration(
+    hard_scores: np.ndarray,
+    y_test: np.ndarray,
+    soft_scores_by_noise: dict[float, np.ndarray],
+) -> None:
+    fig, ax = plt.subplots(figsize=(6, 6))
+    ax.plot([0, 1], [0, 1], color="black", linestyle=":", linewidth=1, label="perfectly calibrated")
+
+    frac_pos, mean_pred = calibration_curve(y_test, hard_scores, n_bins=10, strategy="quantile")
+    ax.plot(mean_pred, frac_pos, marker="o", color="#4477bb", linewidth=1.8, label="hard (Logloss)")
+
+    noise_levels = list(soft_scores_by_noise.keys())
+    cmap = plt.get_cmap("Reds")
+    for i, noise in enumerate(noise_levels):
+        frac_pos, mean_pred = calibration_curve(
+            y_test, soft_scores_by_noise[noise], n_bins=10, strategy="quantile"
+        )
+        color = cmap(0.35 + 0.55 * i / max(1, len(noise_levels) - 1))
+        ax.plot(mean_pred, frac_pos, marker="o", markersize=4, linewidth=1.4,
+                 color=color, label=f"soft noise_max={noise:.2f}")
+
+    ax.set_xlabel("Mean predicted probability")
+    ax.set_ylabel("Fraction of positives (test)")
+    ax.set_title("Calibration (reliability) curves", fontsize=11)
+    ax.set_xlim(0, 1)
+    ax.set_ylim(0, 1)
+    ax.legend(fontsize=8, loc="upper left")
+    ax.grid(alpha=0.3, linestyle=":")
+    fig.tight_layout()
+    path = OUT_DIR / "calibration_curves.png"
+    fig.savefig(path, dpi=130, bbox_inches="tight")
+    plt.close(fig)
+    log.info("saved %s", path.name)
+
+
+def _plot_feature_importance(
+    hard_model: CatBoostClassifier,
+    soft_models: dict[float, CatBoostClassifier],
+    feature_names: list[str],
+) -> None:
+    noise_levels = list(soft_models.keys())
+    hard_imp = hard_model.get_feature_importance()
+
+    n_series = 1 + len(noise_levels)
+    x = np.arange(len(feature_names))
+    width = 0.8 / n_series
+
+    fig, ax = plt.subplots(figsize=(8, 5))
+    ax.bar(x - 0.4 + width / 2, hard_imp, width, color="#4477bb", label="hard (Logloss)")
+
+    cmap = plt.get_cmap("Reds")
+    for i, noise in enumerate(noise_levels):
+        color = cmap(0.35 + 0.55 * i / max(1, len(noise_levels) - 1))
+        soft_imp = soft_models[noise].get_feature_importance()
+        ax.bar(x - 0.4 + width / 2 + (i + 1) * width, soft_imp, width,
+               color=color, label=f"soft noise_max={noise:.2f}")
+
+    ax.set_xticks(x)
+    ax.set_xticklabels(feature_names)
+    ax.set_ylabel("CatBoost feature importance (PredictionValuesChange)")
+    ax.set_title("Feature importance: hard vs soft-label models", fontsize=11)
+    ax.legend(fontsize=7.5, ncol=2)
+    ax.grid(axis="y", alpha=0.28, linestyle=":")
+    fig.tight_layout()
+    path = OUT_DIR / "feature_importance.png"
+    fig.savefig(path, dpi=130, bbox_inches="tight")
+    plt.close(fig)
+    log.info("saved %s", path.name)
+
+
+def _plot_decision_boundary(
+    hard_model: CatBoostClassifier,
+    soft_models: dict[float, CatBoostClassifier],
+    feature_names: list[str],
+    X_train: np.ndarray,
+    y_train: np.ndarray,
+) -> None:
+    idx1, idx2 = 0, 1  # x1, x2 — the two strongest-information features
+    f1, f2 = feature_names[idx1], feature_names[idx2]
+
+    x1_min, x1_max = X_train[:, idx1].min() - 0.5, X_train[:, idx1].max() + 0.5
+    x2_min, x2_max = X_train[:, idx2].min() - 0.5, X_train[:, idx2].max() + 0.5
+    xx, yy = np.meshgrid(np.linspace(x1_min, x1_max, 100), np.linspace(x2_min, x2_max, 100))
+
+    other_means = X_train.mean(axis=0)
+    grid = np.tile(other_means, (xx.size, 1))
+    grid[:, idx1] = xx.ravel()
+    grid[:, idx2] = yy.ravel()
+
+    noise_levels = list(soft_models.keys())
+    models = [("hard (Logloss)", hard_model)] + [
+        (f"soft noise_max={n:.2f}", soft_models[n]) for n in noise_levels
+    ]
+
+    rng = np.random.default_rng(SEED)
+    sub_idx = rng.choice(len(y_train), size=min(400, len(y_train)), replace=False)
+    point_colors = np.where(y_train[sub_idx] == 1, "#cc4444", "#4477bb")
+
+    fig, axes = plt.subplots(1, len(models), figsize=(4 * len(models), 4.4), sharex=True, sharey=True)
+    cf = None
+    for ax, (title, model) in zip(axes, models):
+        proba = model.predict_proba(grid)[:, 1].reshape(xx.shape)
+        cf = ax.contourf(xx, yy, proba, levels=20, cmap="coolwarm", vmin=0, vmax=1, alpha=0.85)
+        ax.scatter(X_train[sub_idx, idx1], X_train[sub_idx, idx2], c=point_colors,
+                   s=6, alpha=0.6, linewidths=0.3, edgecolors="white")
+        ax.set_title(title, fontsize=9)
+        ax.set_xlabel(f1)
+        if ax is axes[0]:
+            ax.set_ylabel(f2)
+
+    fig.colorbar(cf, ax=axes, fraction=0.015, pad=0.015, label="P(y=1)")
+    fig.suptitle(
+        f"Decision surface in ({f1}, {f2}) — other features fixed at their train mean", fontsize=11
+    )
+    path = OUT_DIR / "decision_boundary.png"
+    fig.savefig(path, dpi=130, bbox_inches="tight")
+    plt.close(fig)
+    log.info("saved %s", path.name)
+
+
+def _write_report(rows: list[dict], hard_metrics: dict, img_prefix: str = "outputs/") -> str:
     df = pd.DataFrame(rows)
-    report_path = SCRIPT_DIR / "report.md"
 
     lines: list[str] = [
         "# Noisy Soft Labels — CrossEntropy Report",
@@ -302,14 +426,38 @@ def _write_report(rows: list[dict], hard_metrics: dict) -> None:
         "Histogram of `y_soft` for positives (red) and negatives (blue) across noise levels. Note",
         "that `y_soft` never crosses 0.5 — the noise corrupts confidence, not the class sign.",
         "",
-        "![soft target distribution](outputs/soft_target_distribution.png)",
+        f"![soft target distribution]({img_prefix}soft_target_distribution.png)",
         "",
         "### Metric comparison",
         "",
         "Bar chart of AP / AUC / Brier for the soft (CrossEntropy) model at each noise level,",
         "against the hard (Logloss) baseline (dashed line).",
         "",
-        "![metric comparison](outputs/metric_comparison.png)",
+        f"![metric comparison]({img_prefix}metric_comparison.png)",
+        "",
+        "### Calibration curves",
+        "",
+        "Reliability diagram (10 quantile bins) on the test set. The hard-label model tracks the",
+        "diagonal; soft-label curves flatten toward the middle as `noise_max` grows — a direct",
+        "picture of the calibration compression quantified by the Brier column above.",
+        "",
+        f"![calibration curves]({img_prefix}calibration_curves.png)",
+        "",
+        "### Feature importance",
+        "",
+        "CatBoost `PredictionValuesChange` importance per feature, hard model vs each soft model.",
+        "If CrossEntropy training on noisy targets is behaving sensibly, the ranking of features by",
+        "importance should stay stable across noise levels even as absolute magnitudes shift.",
+        "",
+        f"![feature importance]({img_prefix}feature_importance.png)",
+        "",
+        "### Decision surface",
+        "",
+        "Predicted P(y=1) over the (x1, x2) plane — the two strongest-information features — with",
+        "x3-x5 fixed at their training mean. 400 training points overlaid (red=pos, blue=neg). Shows",
+        "whether the learned boundary itself shifts with noise, independent of the ranking metrics.",
+        "",
+        f"![decision boundary]({img_prefix}decision_boundary.png)",
         "",
     ]
 
@@ -321,7 +469,7 @@ def _write_report(rows: list[dict], hard_metrics: dict) -> None:
             "panels: predicted probability from the CrossEntropy soft model trained at each noise",
             "level, evaluated on the same training points.",
             "",
-            "![umap hard vs scores](outputs/umap_hard_vs_scores.png)",
+            f"![umap hard vs scores]({img_prefix}umap_hard_vs_scores.png)",
             "",
         ]
 
@@ -337,7 +485,8 @@ def _write_report(rows: list[dict], hard_metrics: dict) -> None:
         "",
         "2. **Calibration degrades before ranking does.** As noise_max grows, predicted probabilities",
         "   are compressed toward 0.5 (the model matches the *expected* soft target, which shrinks",
-        "   toward 0.5 as noise grows), so Brier score worsens faster than AP/AUC.",
+        "   toward 0.5 as noise grows), so Brier score worsens faster than AP/AUC — visible directly",
+        "   in the calibration curves flattening toward the horizontal.",
         "",
         "3. **The `separation` column tracks the theoretical decay.** `mean_y_soft_pos -",
         "   mean_y_soft_neg` shrinks linearly from ~0.90 to ~0.50 as noise_max goes from 0.10 to",
@@ -345,13 +494,17 @@ def _write_report(rows: list[dict], hard_metrics: dict) -> None:
         "   grey (0.5) in step with it — the model's confidence output mirrors the label noise it",
         "   was trained on, even though its ranking of examples barely moves.",
         "",
+        "4. **The decision surface and feature ranking are largely noise-invariant.** The contour",
+        "   shape in (x1, x2) and the relative ordering of feature importances stay close to the",
+        "   hard-label model across all noise levels — the noise mainly rescales confidence, it",
+        "   doesn't relocate the boundary or change which features the model leans on.",
+        "",
         "---",
         "",
         "Raw data: `outputs/results.csv`",
     ]
 
-    report_path.write_text("\n".join(lines) + "\n")
-    log.info("saved %s", report_path.name)
+    return "\n".join(lines) + "\n"
 
 
 # ---------------------------------------------------------------------------
@@ -391,6 +544,8 @@ def main() -> None:
     rows: list[dict] = []
     dist_by_noise: dict[float, tuple[np.ndarray, np.ndarray]] = {}
     score_by_noise: dict[float, np.ndarray] = {}
+    test_score_by_noise: dict[float, np.ndarray] = {}
+    soft_models: dict[float, CatBoostClassifier] = {}
 
     for noise_max in NOISE_LEVELS:
         log.info("=== noise_max=%.2f ===", noise_max)
@@ -419,6 +574,8 @@ def main() -> None:
         })
 
         dist_by_noise[noise_max] = (y_soft_train, y_train)
+        test_score_by_noise[noise_max] = soft_test_scores
+        soft_models[noise_max] = soft_model
 
         if _HAS_UMAP:
             score_by_noise[noise_max] = soft_model.predict_proba(X_train)[:, 1]
@@ -428,12 +585,23 @@ def main() -> None:
     results_df.to_csv(csv_path, index=False)
     log.info("saved %s", csv_path.name)
 
+    feature_names = list(FEATURE_INFO.keys())
+
     _plot_soft_distribution(dist_by_noise)
     _plot_metric_comparison(rows, hard_metrics)
+    _plot_calibration(hard_scores, y_test, test_score_by_noise)
+    _plot_feature_importance(hard_model, soft_models, feature_names)
+    _plot_decision_boundary(hard_model, soft_models, feature_names, X_train, y_train)
     if _HAS_UMAP:
         _plot_umap_grid(Z, y_train, score_by_noise)
 
-    _write_report(rows, hard_metrics)
+    report_text = _write_report(rows, hard_metrics, img_prefix="outputs/")
+    (SCRIPT_DIR / "report.md").write_text(report_text)
+    log.info("saved report.md")
+
+    readme_text = _write_report(rows, hard_metrics, img_prefix="")
+    (OUT_DIR / "README.md").write_text(readme_text)
+    log.info("saved outputs/README.md")
 
     log.info("\n=== Summary ===")
     print(results_df.to_string(index=False, float_format="%.4f"))
