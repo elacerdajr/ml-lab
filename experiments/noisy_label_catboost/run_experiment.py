@@ -16,6 +16,13 @@ one CatBoostClassifier per noise level with ``loss_function="CrossEntropy"``
 the positive class) and compare it against a baseline CatBoostClassifier
 trained on the clean hard label with ``loss_function="Logloss"``.
 
+We also fit a CatBoostRegressor with ``loss_function="RMSE"`` on the same
+noisy `y_soft`, at every noise level, to answer a second question: does it
+matter whether you treat the soft target as a classification problem
+(CrossEntropy) or a regression problem (RMSE)? Both losses are proper
+scoring rules whose population optimum is the conditional mean of `y_soft`,
+so we expect their Brier scores to track closely.
+
 Five Gaussian features span a gradient of information levels (x1 strong ...
 x5 near-noise), so we can see whether noisy-label learning degrades faster
 for weak features than for strong ones.
@@ -83,7 +90,7 @@ DGP = GaussianBinaryDGP(p_pos=P_POS, info=FEATURE_INFO, sigma=1.0)
 # ---------------------------------------------------------------------------
 
 try:
-    from catboost import CatBoostClassifier
+    from catboost import CatBoostClassifier, CatBoostRegressor
 
     _HAS_CATBOOST = True
 except ImportError:
@@ -118,6 +125,18 @@ def _fit_soft_model(X: np.ndarray, y_soft: np.ndarray, seed: int) -> CatBoostCla
     model = CatBoostClassifier(
         **CATBOOST_PARAMS,
         loss_function="CrossEntropy",
+        verbose=False,
+        allow_writing_files=False,
+        random_seed=seed,
+    )
+    model.fit(X, y_soft)
+    return model
+
+
+def _fit_soft_regressor(X: np.ndarray, y_soft: np.ndarray, seed: int) -> CatBoostRegressor:
+    model = CatBoostRegressor(
+        **CATBOOST_PARAMS,
+        loss_function="RMSE",
         verbose=False,
         allow_writing_files=False,
         random_seed=seed,
@@ -207,34 +226,41 @@ def _plot_metric_comparison(rows: list[dict], hard_metrics: dict) -> None:
     df = pd.DataFrame(rows)
     noise_levels = df["noise_max"].tolist()
     x = np.arange(len(noise_levels))
-    width = 0.6
+    width = 0.35
 
     metrics = ["ap", "auc", "brier"]
     titles = ["Average Precision", "ROC-AUC", "Brier score (lower is better)"]
 
     fig, axes = plt.subplots(1, 3, figsize=(15, 4.5))
     for ax, metric, title in zip(axes, metrics, titles):
-        soft_vals = df[f"soft_{metric}"].tolist()
-        bars = ax.bar(x, soft_vals, width, color="#cc4444", alpha=0.85, label="soft (CrossEntropy)")
+        clf_vals = df[f"soft_{metric}"].tolist()
+        reg_vals = df[f"reg_{metric}"].tolist()
+        bars_clf = ax.bar(x - width / 2, clf_vals, width, color="#cc4444", alpha=0.85,
+                           label="soft classifier (CrossEntropy)")
+        bars_reg = ax.bar(x + width / 2, reg_vals, width, color="#9955cc", alpha=0.85,
+                           label="soft regressor (RMSE)")
         ax.axhline(
             hard_metrics[metric],
             color="#4477bb",
             linestyle="--",
             linewidth=1.6,
-            label="hard (Logloss) baseline",
+            label="hard classifier (Logloss) baseline",
         )
-        for bar in bars:
+        for bar in list(bars_clf) + list(bars_reg):
             h = bar.get_height()
             ax.text(bar.get_x() + bar.get_width() / 2, h, f"{h:.3f}",
-                    ha="center", va="bottom" if metric != "brier" else "top", fontsize=8)
+                    ha="center", va="bottom" if metric != "brier" else "top", fontsize=7)
         ax.set_xticks(x)
         ax.set_xticklabels([f"{n:.2f}" for n in noise_levels])
         ax.set_xlabel("noise_max")
         ax.set_title(title, fontsize=10)
         ax.grid(axis="y", alpha=0.28, linestyle=":")
-        ax.legend(fontsize=8)
+        ax.legend(fontsize=7.5)
 
-    fig.suptitle("Test-set metrics (evaluated against clean hard labels): soft vs hard training", fontsize=11)
+    fig.suptitle(
+        "Test-set metrics (vs clean hard labels): soft classifier vs soft regressor vs hard baseline",
+        fontsize=11,
+    )
     fig.tight_layout()
     path = OUT_DIR / "metric_comparison.png"
     fig.savefig(path, dpi=130, bbox_inches="tight")
@@ -398,6 +424,17 @@ def _plot_decision_boundary(
     log.info("saved %s", path.name)
 
 
+def _brier_comparison_verdict(df: pd.DataFrame) -> str:
+    clf_wins = int((df["soft_brier"] < df["reg_brier"]).sum())
+    reg_wins = int((df["reg_brier"] < df["soft_brier"]).sum())
+    n = len(df)
+    if clf_wins > reg_wins:
+        return f"classifier has the lower (better) Brier score at {clf_wins}/{n} noise levels"
+    if reg_wins > clf_wins:
+        return f"regressor has the lower (better) Brier score at {reg_wins}/{n} noise levels"
+    return "lower Brier score is split evenly between the two"
+
+
 def _write_report(rows: list[dict], hard_metrics: dict, img_prefix: str = "outputs/") -> str:
     df = pd.DataFrame(rows)
 
@@ -419,7 +456,8 @@ def _write_report(rows: list[dict], hard_metrics: dict, img_prefix: str = "outpu
         f"| Noise levels (noise_max) | {', '.join(f'{n:.2f}' for n in NOISE_LEVELS)} |",
         "| Soft target | y_soft = 1-u if y=1 else u,  u ~ Uniform(0, noise_max) |",
         "| Hard model | CatBoostClassifier, loss_function=Logloss, trained on y |",
-        "| Soft model | CatBoostClassifier, loss_function=CrossEntropy, trained on y_soft |",
+        "| Soft classifier | CatBoostClassifier, loss_function=CrossEntropy, trained on y_soft |",
+        "| Soft regressor | CatBoostRegressor, loss_function=RMSE, trained on y_soft, predictions clipped to [0,1] |",
         f"| CatBoost params | {CATBOOST_PARAMS} |",
         "",
         "---",
@@ -433,7 +471,7 @@ def _write_report(rows: list[dict], hard_metrics: dict, img_prefix: str = "outpu
         "",
         f"AP = {hard_metrics['ap']:.4f}  ·  AUC = {hard_metrics['auc']:.4f}  ·  Brier = {hard_metrics['brier']:.4f}",
         "",
-        "### Soft-label model (CrossEntropy) vs noise level",
+        "### Soft classifier (CrossEntropy) vs noise level",
         "",
         "| noise_max | mean y_soft (pos) | mean y_soft (neg) | separation | AP | AUC | Brier | ΔAP vs hard |",
         "|----------:|-------------------:|-------------------:|-----------:|----:|----:|------:|------------:|",
@@ -449,6 +487,26 @@ def _write_report(rows: list[dict], hard_metrics: dict, img_prefix: str = "outpu
             f"| {r['soft_auc']:.4f} "
             f"| {r['soft_brier']:.4f} "
             f"| {delta:+.4f} |"
+        )
+    lines.append("")
+
+    lines += [
+        "### Soft regressor (RMSE) vs noise level",
+        "",
+        "Same `y_soft` targets, but fit with `CatBoostRegressor(loss_function=\"RMSE\")` instead of a",
+        "classifier — predictions are clipped to [0, 1] before scoring.",
+        "",
+        "| noise_max | AP | AUC | Brier | Brier: classifier − regressor |",
+        "|----------:|----:|----:|------:|-------------------------------:|",
+    ]
+    for _, r in df.iterrows():
+        brier_delta = r["soft_brier"] - r["reg_brier"]
+        lines.append(
+            f"| {r['noise_max']:.2f} "
+            f"| {r['reg_ap']:.4f} "
+            f"| {r['reg_auc']:.4f} "
+            f"| {r['reg_brier']:.4f} "
+            f"| {brier_delta:+.4f} |"
         )
     lines.append("")
 
@@ -473,10 +531,12 @@ def _write_report(rows: list[dict], hard_metrics: dict, img_prefix: str = "outpu
         "",
         f"![score distribution]({img_prefix}score_distribution.png)",
         "",
-        "### Metric comparison",
+        "### Metric comparison — classifier vs regressor",
         "",
-        "Bar chart of AP / AUC / Brier for the soft (CrossEntropy) model at each noise level,",
-        "against the hard (Logloss) baseline (dashed line).",
+        "Bar chart of AP / AUC / Brier for the soft classifier (CrossEntropy) vs the soft regressor",
+        "(RMSE), both trained on the same noisy `y_soft`, at each noise level, against the hard",
+        "(Logloss) baseline (dashed line). The Brier panel is the direct answer to \"does it matter",
+        "whether you treat the soft target as a classification or a regression problem?\"",
         "",
         f"![metric comparison]({img_prefix}metric_comparison.png)",
         "",
@@ -544,6 +604,15 @@ def _write_report(rows: list[dict], hard_metrics: dict, img_prefix: str = "outpu
         "   hard-label model across all noise levels — the noise mainly rescales confidence, it",
         "   doesn't relocate the boundary or change which features the model leans on.",
         "",
+        f"5. **Classifier (CrossEntropy) vs regressor (RMSE) on the same soft target: "
+        f"{_brier_comparison_verdict(df)}.** Brier score is itself a proper scoring rule for a",
+        "   [0,1]-valued target, and RMSE's population-optimal predictor is the conditional mean —",
+        "   exactly what CrossEntropy also targets when the label is a soft probability rather than",
+        "   a hard 0/1. So the two losses share the same population optimum; the",
+        f"   mean |Δ Brier| across noise levels is {df['soft_brier'].sub(df['reg_brier']).abs().mean():.4f}",
+        "   here, consistent with optimisation-level noise rather than a systematic advantage for",
+        "   either loss.",
+        "",
         "---",
         "",
         "Raw data: `outputs/results.csv`",
@@ -590,6 +659,7 @@ def main() -> None:
     dist_by_noise: dict[float, tuple[np.ndarray, np.ndarray]] = {}
     score_by_noise: dict[float, np.ndarray] = {}
     test_score_by_noise: dict[float, np.ndarray] = {}
+    reg_test_score_by_noise: dict[float, np.ndarray] = {}
     soft_models: dict[float, CatBoostClassifier] = {}
 
     for noise_max in NOISE_LEVELS:
@@ -605,8 +675,14 @@ def main() -> None:
         soft_model = _fit_soft_model(X_train, y_soft_train, SEED)
         soft_test_scores = soft_model.predict_proba(X_test)[:, 1]
         soft_metrics = _eval_metrics(soft_test_scores, y_test)
-        log.info("  soft model: AP=%.4f AUC=%.4f Brier=%.4f",
+        log.info("  soft classifier (CrossEntropy): AP=%.4f AUC=%.4f Brier=%.4f",
                   soft_metrics["ap"], soft_metrics["auc"], soft_metrics["brier"])
+
+        soft_regressor = _fit_soft_regressor(X_train, y_soft_train, SEED)
+        reg_test_scores = np.clip(soft_regressor.predict(X_test), 0.0, 1.0)
+        reg_metrics = _eval_metrics(reg_test_scores, y_test)
+        log.info("  soft regressor (RMSE):         AP=%.4f AUC=%.4f Brier=%.4f",
+                  reg_metrics["ap"], reg_metrics["auc"], reg_metrics["brier"])
 
         rows.append({
             "noise_max": noise_max,
@@ -616,10 +692,14 @@ def main() -> None:
             "soft_ap": soft_metrics["ap"],
             "soft_auc": soft_metrics["auc"],
             "soft_brier": soft_metrics["brier"],
+            "reg_ap": reg_metrics["ap"],
+            "reg_auc": reg_metrics["auc"],
+            "reg_brier": reg_metrics["brier"],
         })
 
         dist_by_noise[noise_max] = (y_soft_train, y_train)
         test_score_by_noise[noise_max] = soft_test_scores
+        reg_test_score_by_noise[noise_max] = reg_test_scores
         soft_models[noise_max] = soft_model
 
         if _HAS_UMAP:

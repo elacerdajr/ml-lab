@@ -15,7 +15,8 @@
 | Noise levels (noise_max) | 0.10, 0.20, 0.30, 0.40, 0.50 |
 | Soft target | y_soft = 1-u if y=1 else u,  u ~ Uniform(0, noise_max) |
 | Hard model | CatBoostClassifier, loss_function=Logloss, trained on y |
-| Soft model | CatBoostClassifier, loss_function=CrossEntropy, trained on y_soft |
+| Soft classifier | CatBoostClassifier, loss_function=CrossEntropy, trained on y_soft |
+| Soft regressor | CatBoostRegressor, loss_function=RMSE, trained on y_soft, predictions clipped to [0,1] |
 | CatBoost params | {'iterations': 300, 'depth': 4, 'learning_rate': 0.06} |
 
 ---
@@ -29,7 +30,7 @@ soft model never sees a hard label at train time, only the noisy `y_soft`.
 
 AP = 0.8510  ·  AUC = 0.9072  ·  Brier = 0.1154
 
-### Soft-label model (CrossEntropy) vs noise level
+### Soft classifier (CrossEntropy) vs noise level
 
 | noise_max | mean y_soft (pos) | mean y_soft (neg) | separation | AP | AUC | Brier | ΔAP vs hard |
 |----------:|-------------------:|-------------------:|-----------:|----:|----:|------:|------------:|
@@ -38,6 +39,19 @@ AP = 0.8510  ·  AUC = 0.9072  ·  Brier = 0.1154
 | 0.30 | 0.8488 | 0.1486 | 0.7002 | 0.8503 | 0.9072 | 0.1256 | -0.0007 |
 | 0.40 | 0.8012 | 0.2048 | 0.5965 | 0.8506 | 0.9050 | 0.1363 | -0.0004 |
 | 0.50 | 0.7488 | 0.2460 | 0.5028 | 0.8437 | 0.9049 | 0.1457 | -0.0073 |
+
+### Soft regressor (RMSE) vs noise level
+
+Same `y_soft` targets, but fit with `CatBoostRegressor(loss_function="RMSE")` instead of a
+classifier — predictions are clipped to [0, 1] before scoring.
+
+| noise_max | AP | AUC | Brier | Brier: classifier − regressor |
+|----------:|----:|----:|------:|-------------------------------:|
+| 0.10 | 0.8526 | 0.9087 | 0.1146 | +0.0008 |
+| 0.20 | 0.8502 | 0.9082 | 0.1185 | +0.0003 |
+| 0.30 | 0.8514 | 0.9087 | 0.1250 | +0.0006 |
+| 0.40 | 0.8528 | 0.9065 | 0.1361 | +0.0002 |
+| 0.50 | 0.8484 | 0.9071 | 0.1455 | +0.0003 |
 
 ---
 
@@ -59,10 +73,12 @@ pos/neg histograms visibly move closer together as noise_max grows.
 
 ![score distribution](score_distribution.png)
 
-### Metric comparison
+### Metric comparison — classifier vs regressor
 
-Bar chart of AP / AUC / Brier for the soft (CrossEntropy) model at each noise level,
-against the hard (Logloss) baseline (dashed line).
+Bar chart of AP / AUC / Brier for the soft classifier (CrossEntropy) vs the soft regressor
+(RMSE), both trained on the same noisy `y_soft`, at each noise level, against the hard
+(Logloss) baseline (dashed line). The Brier panel is the direct answer to "does it matter
+whether you treat the soft target as a classification or a regression problem?"
 
 ![metric comparison](metric_comparison.png)
 
@@ -122,6 +138,14 @@ level, evaluated on the same training points.
    shape in (x1, x2) and the relative ordering of feature importances stay close to the
    hard-label model across all noise levels — the noise mainly rescales confidence, it
    doesn't relocate the boundary or change which features the model leans on.
+
+5. **Classifier (CrossEntropy) vs regressor (RMSE) on the same soft target: regressor has the lower (better) Brier score at 5/5 noise levels.** Brier score is itself a proper scoring rule for a
+   [0,1]-valued target, and RMSE's population-optimal predictor is the conditional mean —
+   exactly what CrossEntropy also targets when the label is a soft probability rather than
+   a hard 0/1. So the two losses share the same population optimum; the
+   mean |Δ Brier| across noise levels is 0.0004
+   here, consistent with optimisation-level noise rather than a systematic advantage for
+   either loss.
 
 ---
 
