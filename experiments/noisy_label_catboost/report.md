@@ -73,6 +73,17 @@ pos/neg histograms visibly move closer together as noise_max grows.
 
 ![score distribution](outputs/score_distribution.png)
 
+### Score vs soft training target
+
+Scatter of each model's own predicted score against the noisy `y_soft` it was trained on
+(train set, 600-point subsample, coloured by the true hard label). Top row: classifier
+(CrossEntropy). Bottom row: regressor (RMSE). The dotted line is `y = x` — points hugging
+it means the model just memorised the noise; points collapsing toward two horizontal bands
+(one per class) mean the model denoised `y_soft` back toward the true class probability.
+The `corr` annotation is the Pearson correlation between predicted score and `y_soft`.
+
+![score vs soft target](outputs/score_vs_soft_target.png)
+
 ### Metric comparison — classifier vs regressor
 
 Bar chart of AP / AUC / Brier for the soft classifier (CrossEntropy) vs the soft regressor

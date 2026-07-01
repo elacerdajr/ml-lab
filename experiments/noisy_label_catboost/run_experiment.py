@@ -31,6 +31,7 @@ Outputs (experiments/noisy_label_catboost/outputs/):
   results.csv
   soft_target_distribution.png
   score_distribution.png
+  score_vs_soft_target.png
   metric_comparison.png
   calibration_curves.png
   feature_importance.png
@@ -51,6 +52,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from matplotlib.lines import Line2D
 from sklearn.calibration import calibration_curve
 from sklearn.metrics import average_precision_score, brier_score_loss, roc_auc_score
 
@@ -217,6 +219,58 @@ def _plot_score_distribution(
     fig.suptitle("Predicted score distribution on test set — hard vs soft models per noise level", fontsize=11, y=1.02)
     fig.tight_layout()
     path = OUT_DIR / "score_distribution.png"
+    fig.savefig(path, dpi=130, bbox_inches="tight")
+    plt.close(fig)
+    log.info("saved %s", path.name)
+
+
+def _plot_score_vs_soft_target(
+    dist_by_noise: dict[float, tuple[np.ndarray, np.ndarray]],
+    clf_train_score_by_noise: dict[float, np.ndarray],
+    reg_train_score_by_noise: dict[float, np.ndarray],
+) -> None:
+    """Scatter of predicted score vs the noisy y_soft it was trained on (train set)."""
+    noise_levels = list(dist_by_noise.keys())
+    n = len(noise_levels)
+    fig, axes = plt.subplots(2, n, figsize=(3.4 * n, 7.0), sharex=True, sharey=True)
+
+    rng = np.random.default_rng(SEED)
+    model_rows = [
+        ("classifier\n(CrossEntropy)", clf_train_score_by_noise),
+        ("regressor\n(RMSE)", reg_train_score_by_noise),
+    ]
+
+    for col, noise in enumerate(noise_levels):
+        y_soft, y = dist_by_noise[noise]
+        sub_idx = rng.choice(len(y), size=min(600, len(y)), replace=False)
+        point_colors = np.where(y[sub_idx] == 1, "#cc4444", "#4477bb")
+
+        for row, (row_label, score_by_noise) in enumerate(model_rows):
+            ax = axes[row, col]
+            scores = score_by_noise[noise]
+            corr = float(np.corrcoef(y_soft, scores)[0, 1])
+
+            ax.plot([0, 1], [0, 1], color="black", linestyle=":", linewidth=1)
+            ax.scatter(y_soft[sub_idx], scores[sub_idx], c=point_colors, s=8, alpha=0.5, linewidths=0)
+            title = f"noise_max={noise:.2f}  (corr={corr:.3f})" if row == 0 else f"corr={corr:.3f}"
+            ax.set_title(title, fontsize=9)
+            ax.set_xlim(0, 1)
+            ax.set_ylim(0, 1)
+            ax.grid(alpha=0.25, linestyle=":")
+            if col == 0:
+                ax.set_ylabel(f"{row_label}\npredicted score (train)", fontsize=8)
+            if row == 1:
+                ax.set_xlabel("y_soft (train)", fontsize=9)
+
+    handles = [
+        Line2D([0], [0], marker="o", color="w", markerfacecolor="#4477bb", markersize=7, label="neg (y=0)"),
+        Line2D([0], [0], marker="o", color="w", markerfacecolor="#cc4444", markersize=7, label="pos (y=1)"),
+        Line2D([0], [0], color="black", linestyle=":", linewidth=1, label="y = x"),
+    ]
+    fig.legend(handles=handles, loc="upper center", ncol=3, fontsize=8.5, bbox_to_anchor=(0.5, 1.04))
+    fig.suptitle("Predicted score vs noisy soft training target (train set)", fontsize=11, y=1.09)
+    fig.tight_layout()
+    path = OUT_DIR / "score_vs_soft_target.png"
     fig.savefig(path, dpi=130, bbox_inches="tight")
     plt.close(fig)
     log.info("saved %s", path.name)
@@ -531,6 +585,17 @@ def _write_report(rows: list[dict], hard_metrics: dict, img_prefix: str = "outpu
         "",
         f"![score distribution]({img_prefix}score_distribution.png)",
         "",
+        "### Score vs soft training target",
+        "",
+        "Scatter of each model's own predicted score against the noisy `y_soft` it was trained on",
+        "(train set, 600-point subsample, coloured by the true hard label). Top row: classifier",
+        "(CrossEntropy). Bottom row: regressor (RMSE). The dotted line is `y = x` — points hugging",
+        "it means the model just memorised the noise; points collapsing toward two horizontal bands",
+        "(one per class) mean the model denoised `y_soft` back toward the true class probability.",
+        "The `corr` annotation is the Pearson correlation between predicted score and `y_soft`.",
+        "",
+        f"![score vs soft target]({img_prefix}score_vs_soft_target.png)",
+        "",
         "### Metric comparison — classifier vs regressor",
         "",
         "Bar chart of AP / AUC / Brier for the soft classifier (CrossEntropy) vs the soft regressor",
@@ -657,7 +722,8 @@ def main() -> None:
 
     rows: list[dict] = []
     dist_by_noise: dict[float, tuple[np.ndarray, np.ndarray]] = {}
-    score_by_noise: dict[float, np.ndarray] = {}
+    clf_train_score_by_noise: dict[float, np.ndarray] = {}
+    reg_train_score_by_noise: dict[float, np.ndarray] = {}
     test_score_by_noise: dict[float, np.ndarray] = {}
     reg_test_score_by_noise: dict[float, np.ndarray] = {}
     soft_models: dict[float, CatBoostClassifier] = {}
@@ -702,8 +768,8 @@ def main() -> None:
         reg_test_score_by_noise[noise_max] = reg_test_scores
         soft_models[noise_max] = soft_model
 
-        if _HAS_UMAP:
-            score_by_noise[noise_max] = soft_model.predict_proba(X_train)[:, 1]
+        clf_train_score_by_noise[noise_max] = soft_model.predict_proba(X_train)[:, 1]
+        reg_train_score_by_noise[noise_max] = np.clip(soft_regressor.predict(X_train), 0.0, 1.0)
 
     results_df = pd.DataFrame(rows)
     csv_path = OUT_DIR / "results.csv"
@@ -714,12 +780,13 @@ def main() -> None:
 
     _plot_soft_distribution(dist_by_noise)
     _plot_score_distribution(hard_scores, y_test, test_score_by_noise)
+    _plot_score_vs_soft_target(dist_by_noise, clf_train_score_by_noise, reg_train_score_by_noise)
     _plot_metric_comparison(rows, hard_metrics)
     _plot_calibration(hard_scores, y_test, test_score_by_noise)
     _plot_feature_importance(hard_model, soft_models, feature_names)
     _plot_decision_boundary(hard_model, soft_models, feature_names, X_train, y_train)
     if _HAS_UMAP:
-        _plot_umap_grid(Z, y_train, score_by_noise)
+        _plot_umap_grid(Z, y_train, clf_train_score_by_noise)
 
     report_text = _write_report(rows, hard_metrics, img_prefix="outputs/")
     (SCRIPT_DIR / "report.md").write_text(report_text)
