@@ -25,5 +25,7 @@ exp-weak-features:  ## Sweep training size with 100 weak features; compare CatBo
 exp-weak-features-beta:  ## Same as exp-weak-features but info_j ~ Beta(1,9) instead of constant 0.10
 	cd experiments/weak_features_beta && $(PYTHON) run_experiment.py
 
+exp-leaf-embedding-ranking:  ## Leaf-embedding residual ranking: Ridge-on-leaves + ECDF rank spreading vs raw CatBoost probability
+	cd experiments/leaf_embedding_ranking && $(PYTHON) run_experiment.py
 exp-noisy-label-catboost:  ## CatBoost CrossEntropy on noisy soft labels vs Logloss on hard labels, across noise levels
 	cd experiments/noisy_label_catboost && $(PYTHON) run_experiment.py
