@@ -22,6 +22,12 @@ ShiftedDGP
     ``shift_fn(df) -> df``. Use it to inject distribution shift,
     feature scaling, or any other transformation without touching
     the base DGP.
+
+BlobRegressionDGP
+    Synthetic regression generator: n overlapping 2D blobs (x1, x2),
+    a string blob id (x3), and a continuous target y that is constant
+    per blob (mean drawn once from Uniform(target_low, target_high))
+    plus optional Gaussian noise.
 """
 
 from __future__ import annotations
@@ -230,3 +236,120 @@ class ShiftedDGP:
         """
         df = self.base.sample(n, seed)
         return self.shift_fn(df)
+
+
+class BlobRegressionDGP:
+    """
+    Regression DGP: overlapping 2D blobs with a constant target per blob.
+
+    Data model
+    ----------
+    Blob geometry and per-blob target means are fixed once at construction
+    (via ``center_seed``), so repeated ``sample(n, seed)`` calls draw i.i.d.
+    rows from a *fixed* process — only the per-call ``seed`` varies which
+    blob each row lands in and the within-blob / label noise.
+
+    center_j ~ Normal(0, center_std)                for j in 0..n_blobs-1
+    blob_mean_j ~ Uniform(target_low, target_high)   for j in 0..n_blobs-1
+
+    row i:
+        blob(i) ~ DiscreteUniform(0, n_blobs-1)
+        x1, x2 | blob(i) ~ Normal(center_{blob(i)}, blob_std)
+        x3 = f"blob_{blob(i)}"
+        y  = blob_mean_{blob(i)} + Normal(0, noise_std)
+
+    A small ``center_std`` relative to ``blob_std`` makes the blobs overlap
+    heavily, so the model must recover the underlying blob structure from
+    (x1, x2) alone — it never sees x3.
+
+    Parameters
+    ----------
+    n_blobs : int
+        Number of blobs.
+    center_std : float
+        Standard deviation used to scatter blob centers around the origin.
+        Small relative to ``blob_std`` means blobs sit close to / on top of
+        each other.
+    blob_std : float
+        Within-blob standard deviation for x1 and x2.
+    target_low, target_high : float
+        Range of the Uniform distribution each blob's mean target is drawn
+        from.
+    noise_std : float
+        Standard deviation of Gaussian noise added to y on top of the
+        blob's constant mean. Zero means y is exactly piecewise-constant.
+    center_seed : int
+        Seed used to fix blob centers and blob means at construction.
+
+    Examples
+    --------
+    >>> dgp = BlobRegressionDGP(n_blobs=10, center_seed=0)
+    >>> df = dgp.sample(n=1000, seed=42)
+    >>> df.columns.tolist()
+    ['y', 'x1', 'x2', 'x3']
+    >>> df["x3"].nunique()
+    10
+    """
+
+    def __init__(
+        self,
+        n_blobs: int = 10,
+        center_std: float = 1.5,
+        blob_std: float = 1.0,
+        target_low: float = 0.0,
+        target_high: float = 0.5,
+        noise_std: float = 0.05,
+        center_seed: int = 0,
+    ) -> None:
+        if n_blobs <= 0:
+            raise ValueError(f"n_blobs must be positive, got {n_blobs}")
+        if blob_std <= 0:
+            raise ValueError(f"blob_std must be positive, got {blob_std}")
+        if target_low >= target_high:
+            raise ValueError(
+                f"target_low must be < target_high, got {target_low} >= {target_high}"
+            )
+        if noise_std < 0:
+            raise ValueError(f"noise_std must be non-negative, got {noise_std}")
+
+        self.n_blobs = n_blobs
+        self.center_std = center_std
+        self.blob_std = blob_std
+        self.target_low = target_low
+        self.target_high = target_high
+        self.noise_std = noise_std
+        self.center_seed = center_seed
+
+        rng = np.random.default_rng(center_seed)
+        self.centers = rng.normal(loc=0.0, scale=center_std, size=(n_blobs, 2))
+        self.blob_means = rng.uniform(target_low, target_high, size=n_blobs)
+        self.blob_ids = [f"blob_{i}" for i in range(n_blobs)]
+
+    def sample(self, n: int, seed: int) -> pd.DataFrame:
+        """
+        Draw n labelled rows.
+
+        Parameters
+        ----------
+        n : int
+            Number of rows.
+        seed : int
+            Random seed controlling blob assignment and noise.
+
+        Returns
+        -------
+        pd.DataFrame
+            Columns: ``y`` (continuous target), ``x1``, ``x2`` (coordinates),
+            ``x3`` (string blob id).
+        """
+        rng = np.random.default_rng(seed)
+
+        assignment = rng.integers(0, self.n_blobs, size=n)
+        x1 = self.centers[assignment, 0] + rng.normal(0.0, self.blob_std, size=n)
+        x2 = self.centers[assignment, 1] + rng.normal(0.0, self.blob_std, size=n)
+        x3 = np.array(self.blob_ids)[assignment]
+        y = self.blob_means[assignment]
+        if self.noise_std > 0:
+            y = y + rng.normal(0.0, self.noise_std, size=n)
+
+        return pd.DataFrame({"y": y, "x1": x1, "x2": x2, "x3": x3})
