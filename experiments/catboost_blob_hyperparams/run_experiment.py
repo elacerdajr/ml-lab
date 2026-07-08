@@ -1,11 +1,11 @@
 """
-CatBoost Hyperparameter Sweep — Overlapping Blob Regression
-=============================================================
-Ten overlapping 2D blobs (x1, x2), each with its own constant target mean
-drawn from Uniform(0, 0.5) (blob id x3 is withheld from training — it would
-trivially solve the task). A CatBoostRegressor is trained on x1/x2 only and
-swept over `depth` and `iterations` to see how well it recovers the
-underlying blob structure from coordinates alone.
+CatBoost Hyperparameter Sweep — Overlapping Blob Classification
+=================================================================
+Ten overlapping 2D blobs (x1, x2), each with its own positive rate
+P(y=1) drawn from Uniform(0, 0.5) (blob id x3 is withheld from training —
+it would trivially solve the task). A CatBoostClassifier is trained on
+x1/x2 only and swept over `depth` and `iterations` to see how well it
+recovers each blob's positive rate from coordinates alone.
 
 Outputs (experiments/catboost_blob_hyperparams/outputs/):
   depth_sweep.png
@@ -24,14 +24,15 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from sklearn.metrics import mean_squared_error, r2_score
 
 SCRIPT_DIR = Path(__file__).parent
 OUT_DIR = SCRIPT_DIR / "outputs"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 sys.path.insert(0, str(SCRIPT_DIR.parent.parent))
-from ml_elements.dgp import BlobRegressionDGP
+from ml_elements.dgp import BlobClassificationDGP
+from ml_elements.metrics import AUC, AVG_PRECISION
+from ml_elements.models import make_catboost
 
 logging.basicConfig(
     level=logging.INFO,
@@ -41,7 +42,7 @@ logging.basicConfig(
 log = logging.getLogger(__name__)
 
 try:
-    from catboost import CatBoostRegressor
+    import catboost  # noqa: F401
     _HAS_CATBOOST = True
 except ImportError:
     _HAS_CATBOOST = False
@@ -51,19 +52,18 @@ except ImportError:
 # ---------------------------------------------------------------------------
 
 N_BLOBS = 10
-TARGET_LOW = 0.0
-TARGET_HIGH = 0.5
+P_LOW = 0.0
+P_HIGH = 0.5
 SEED = 42
 N_TRAIN = 4_000
 N_PLOT = 800
 
-DGP = BlobRegressionDGP(
+DGP = BlobClassificationDGP(
     n_blobs=N_BLOBS,
     center_std=1.5,
     blob_std=1.0,
-    target_low=TARGET_LOW,
-    target_high=TARGET_HIGH,
-    noise_std=0.05,
+    p_low=P_LOW,
+    p_high=P_HIGH,
     center_seed=0,
 )
 
@@ -82,20 +82,12 @@ FEATURES = ["x1", "x2"]
 def _fit_and_score(
     train_df: pd.DataFrame, plot_df: pd.DataFrame, depth: int, iterations: int
 ) -> tuple[np.ndarray, float, float]:
-    model = CatBoostRegressor(
-        iterations=iterations,
-        depth=depth,
-        learning_rate=0.06,
-        loss_function="RMSE",
-        random_seed=SEED,
-        verbose=False,
-        allow_writing_files=False,
-    )
+    model = make_catboost(iterations=iterations, depth=depth, random_state=SEED)()
     model.fit(train_df[FEATURES], train_df["y"])
-    y_hat = model.predict(plot_df[FEATURES])
-    rmse = float(np.sqrt(mean_squared_error(plot_df["y"], y_hat)))
-    r2 = float(r2_score(plot_df["y"], y_hat))
-    return y_hat, rmse, r2
+    y_hat = model.predict_proba(plot_df[FEATURES])[:, 1]
+    auc = AUC.score(plot_df["y"].to_numpy(), y_hat)
+    ap = AVG_PRECISION.score(plot_df["y"].to_numpy(), y_hat)
+    return y_hat, auc, ap
 
 
 # ---------------------------------------------------------------------------
@@ -116,7 +108,7 @@ def _plot_sweep(
     x1, x2 = plot_df["x1"].to_numpy(), plot_df["x2"].to_numpy()
     blob_ids = sorted(plot_df["x3"].unique())
     blob_idx = plot_df["x3"].map({b: i for i, b in enumerate(blob_ids)}).to_numpy()
-    blob_true_mean = plot_df.groupby("x3")["y"].transform("mean").to_numpy()
+    blob_true_rate = plot_df.groupby("x3")["y"].transform("mean").to_numpy()
 
     for row_i, row in enumerate(rows):
         ax_left, ax_mid, ax_right = axes[row_i]
@@ -126,19 +118,19 @@ def _plot_sweep(
         ax_left.set_ylabel(f"{param_name}={row[param_name]}", fontsize=11)
 
         sc_mid = ax_mid.scatter(
-            x1, x2, c=blob_true_mean, cmap="viridis", vmin=TARGET_LOW, vmax=TARGET_HIGH,
+            x1, x2, c=blob_true_rate, cmap="viridis", vmin=P_LOW, vmax=P_HIGH,
             s=14, alpha=0.8,
         )
         ax_mid.set_title("colored by groupby(X3).mean(y)" if row_i == 0 else "", fontsize=10)
 
         sc_right = ax_right.scatter(
-            x1, x2, c=row["y_hat"], cmap="viridis", vmin=TARGET_LOW, vmax=TARGET_HIGH,
+            x1, x2, c=row["y_hat"], cmap="viridis", vmin=P_LOW, vmax=P_HIGH,
             s=14, alpha=0.8,
         )
         ax_right.set_title(
-            f"model score (RMSE={row['rmse']:.4f}, R²={row['r2']:.3f})"
+            f"model score (AUC={row['auc']:.4f}, AP={row['ap']:.3f})"
             if row_i == 0
-            else f"RMSE={row['rmse']:.4f}, R²={row['r2']:.3f}",
+            else f"AUC={row['auc']:.4f}, AP={row['ap']:.3f}",
             fontsize=10,
         )
 
@@ -168,22 +160,23 @@ def main() -> None:
         sys.exit(1)
 
     log.info(
-        "Generating data — n_train=%d  n_plot=%d  n_blobs=%d  target~Uniform(%.2f, %.2f)",
-        N_TRAIN, N_PLOT, N_BLOBS, TARGET_LOW, TARGET_HIGH,
+        "Generating data — n_train=%d  n_plot=%d  n_blobs=%d  p~Uniform(%.2f, %.2f)",
+        N_TRAIN, N_PLOT, N_BLOBS, P_LOW, P_HIGH,
     )
     train_df = DGP.sample(n=N_TRAIN, seed=SEED)
     plot_df = DGP.sample(n=N_PLOT, seed=SEED + 1_000)
+    log.info("Train positives: %d / %d (%.1f%%)", train_df["y"].sum(), N_TRAIN, 100 * train_df["y"].mean())
 
     results: list[dict] = []
 
     log.info("=== Depth sweep (iterations=%d fixed) ===", FIXED_ITERATIONS)
     depth_rows: list[dict] = []
     for depth in DEPTH_TRIALS:
-        y_hat, rmse, r2 = _fit_and_score(train_df, plot_df, depth, FIXED_ITERATIONS)
-        log.info("  depth=%d  RMSE=%.4f  R2=%.3f", depth, rmse, r2)
-        row = {"depth": depth, "iterations": FIXED_ITERATIONS, "y_hat": y_hat, "rmse": rmse, "r2": r2}
+        y_hat, auc, ap = _fit_and_score(train_df, plot_df, depth, FIXED_ITERATIONS)
+        log.info("  depth=%d  AUC=%.4f  AP=%.3f", depth, auc, ap)
+        row = {"depth": depth, "iterations": FIXED_ITERATIONS, "y_hat": y_hat, "auc": auc, "ap": ap}
         depth_rows.append(row)
-        results.append({"sweep": "depth", "depth": depth, "iterations": FIXED_ITERATIONS, "rmse": rmse, "r2": r2})
+        results.append({"sweep": "depth", "depth": depth, "iterations": FIXED_ITERATIONS, "auc": auc, "ap": ap})
 
     _plot_sweep(
         depth_rows, plot_df, "depth",
@@ -194,11 +187,11 @@ def main() -> None:
     log.info("=== Iterations sweep (depth=%d fixed) ===", FIXED_DEPTH)
     iter_rows: list[dict] = []
     for iterations in ITERATION_TRIALS:
-        y_hat, rmse, r2 = _fit_and_score(train_df, plot_df, FIXED_DEPTH, iterations)
-        log.info("  iterations=%d  RMSE=%.4f  R2=%.3f", iterations, rmse, r2)
-        row = {"depth": FIXED_DEPTH, "iterations": iterations, "y_hat": y_hat, "rmse": rmse, "r2": r2}
+        y_hat, auc, ap = _fit_and_score(train_df, plot_df, FIXED_DEPTH, iterations)
+        log.info("  iterations=%d  AUC=%.4f  AP=%.3f", iterations, auc, ap)
+        row = {"depth": FIXED_DEPTH, "iterations": iterations, "y_hat": y_hat, "auc": auc, "ap": ap}
         iter_rows.append(row)
-        results.append({"sweep": "iterations", "depth": FIXED_DEPTH, "iterations": iterations, "rmse": rmse, "r2": r2})
+        results.append({"sweep": "iterations", "depth": FIXED_DEPTH, "iterations": iterations, "auc": auc, "ap": ap})
 
     _plot_sweep(
         iter_rows, plot_df, "iterations",
@@ -211,20 +204,20 @@ def main() -> None:
     results_df.to_csv(csv_path, index=False)
     log.info("saved %s", csv_path.name)
 
-    _write_report(results_df)
+    _write_report(results_df, train_df)
 
     log.info("\n=== Summary ===")
     print(results_df.to_string(index=False, float_format="%.4f"))
 
 
-def _write_report(results_df: pd.DataFrame) -> None:
+def _write_report(results_df: pd.DataFrame, train_df: pd.DataFrame) -> None:
     report_path = SCRIPT_DIR / "report.md"
 
     depth_sub = results_df[results_df["sweep"] == "depth"]
     iter_sub = results_df[results_df["sweep"] == "iterations"]
 
     lines: list[str] = [
-        "# CatBoost Hyperparameter Sweep — Overlapping Blob Regression",
+        "# CatBoost Hyperparameter Sweep — Overlapping Blob Classification",
         "",
         "> Generated by `experiments/catboost_blob_hyperparams/run_experiment.py`",
         "",
@@ -234,12 +227,13 @@ def _write_report(results_df: pd.DataFrame) -> None:
         "",
         "| Parameter | Value |",
         "|-----------|-------|",
-        "| DGP | BlobRegressionDGP |",
+        "| DGP | BlobClassificationDGP |",
         f"| n_blobs | {N_BLOBS} |",
-        f"| Target range | Uniform({TARGET_LOW}, {TARGET_HIGH}) per blob |",
+        f"| Positive rate range | Uniform({P_LOW}, {P_HIGH}) per blob |",
         f"| n_train / n_plot | {N_TRAIN:,} / {N_PLOT:,} |",
+        f"| Train positive rate | {train_df['y'].mean():.1%} |",
         "| Model features | x1, x2 (x3 blob id withheld) |",
-        "| Model | CatBoostRegressor (RMSE loss) |",
+        "| Model | CatBoostClassifier (Logloss, via `ml_elements.models.make_catboost`) |",
         f"| Depth sweep | {DEPTH_TRIALS} (iterations={FIXED_ITERATIONS} fixed) |",
         f"| Iterations sweep | {ITERATION_TRIALS} (depth={FIXED_DEPTH} fixed) |",
         "",
@@ -249,21 +243,21 @@ def _write_report(results_df: pd.DataFrame) -> None:
         "",
         "### Depth sweep",
         "",
-        "| depth | RMSE | R² |",
-        "|------:|-----:|---:|",
+        "| depth | AUC | AP |",
+        "|------:|----:|---:|",
     ]
     for _, r in depth_sub.iterrows():
-        lines.append(f"| {int(r['depth'])} | {r['rmse']:.4f} | {r['r2']:.3f} |")
+        lines.append(f"| {int(r['depth'])} | {r['auc']:.4f} | {r['ap']:.3f} |")
 
     lines += [
         "",
         "### Iterations sweep",
         "",
-        "| iterations | RMSE | R² |",
-        "|-----------:|-----:|---:|",
+        "| iterations | AUC | AP |",
+        "|-----------:|----:|---:|",
     ]
     for _, r in iter_sub.iterrows():
-        lines.append(f"| {int(r['iterations'])} | {r['rmse']:.4f} | {r['r2']:.3f} |")
+        lines.append(f"| {int(r['iterations'])} | {r['auc']:.4f} | {r['ap']:.3f} |")
 
     lines += [
         "",
@@ -272,10 +266,10 @@ def _write_report(results_df: pd.DataFrame) -> None:
         "## Figures",
         "",
         "Each row is one hyperparameter trial. Left: points colored by true blob id (X3).",
-        "Middle: points colored by the true per-blob mean target (groupby(X3).mean(y)) —",
+        "Middle: points colored by the true per-blob positive rate (groupby(X3).mean(y)) —",
         "this is the ground-truth surface the model has to recover from (x1, x2) alone.",
-        "Right: points colored by the model's predicted score, on the same color scale",
-        "as the middle panel for direct visual comparison.",
+        "Right: points colored by the model's predicted probability (predict_proba), on the",
+        "same color scale as the middle panel for direct visual comparison.",
         "",
         "![depth sweep](outputs/depth_sweep.png)",
         "",

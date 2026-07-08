@@ -30,5 +30,5 @@ exp-leaf-embedding-ranking:  ## Leaf-embedding residual ranking: Ridge-on-leaves
 exp-noisy-label-catboost:  ## CatBoost CrossEntropy on noisy soft labels vs Logloss on hard labels, across noise levels
 	cd experiments/noisy_label_catboost && $(PYTHON) run_experiment.py
 
-exp-catboost-blob-hyperparams:  ## CatBoost depth/iterations sweep on overlapping-blob regression targets
+exp-catboost-blob-hyperparams:  ## CatBoost depth/iterations sweep on overlapping-blob classification targets
 	cd experiments/catboost_blob_hyperparams && $(PYTHON) run_experiment.py

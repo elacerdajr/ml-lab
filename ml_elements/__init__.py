@@ -12,7 +12,7 @@ Import everything in one line:
 Or import specific blocks:
 
     from ml_exp import (
-        GaussianBinaryDGP, RealDataDGP, ShiftedDGP, BlobRegressionDGP,
+        GaussianBinaryDGP, RealDataDGP, ShiftedDGP, BlobClassificationDGP,
         make_logistic, make_hgb, make_catboost, make_sklearn,
         AUC, LOGLOSS, AVG_PRECISION, AVG_PRECISION_SMOOTH, Metric, make_smooth_ap,
         DataBudget, Trial,
@@ -82,7 +82,7 @@ from .embedding_pca import (
     plot_pca_variance,
 )
 from .rich_logger import RichLogger
-from .dgp import BlobRegressionDGP, GaussianBinaryDGP, RealDataDGP, ShiftedDGP
+from .dgp import BlobClassificationDGP, GaussianBinaryDGP, RealDataDGP, ShiftedDGP
 from .objectives import (
     COEF_L1,
     N_ITER,
@@ -135,7 +135,7 @@ __all__ = [
     "GaussianBinaryDGP",
     "RealDataDGP",
     "ShiftedDGP",
-    "BlobRegressionDGP",
+    "BlobClassificationDGP",
     # Model factories
     "make_logistic",
     "make_hgb",

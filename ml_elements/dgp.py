@@ -23,11 +23,11 @@ ShiftedDGP
     feature scaling, or any other transformation without touching
     the base DGP.
 
-BlobRegressionDGP
-    Synthetic regression generator: n overlapping 2D blobs (x1, x2),
-    a string blob id (x3), and a continuous target y that is constant
-    per blob (mean drawn once from Uniform(target_low, target_high))
-    plus optional Gaussian noise.
+BlobClassificationDGP
+    Synthetic binary classification generator: n overlapping 2D blobs
+    (x1, x2), a string blob id (x3), and a binary target y drawn
+    Bernoulli(p_blob) where each blob's rate p_blob is drawn once from
+    Uniform(p_low, p_high).
 """
 
 from __future__ import annotations
@@ -238,28 +238,29 @@ class ShiftedDGP:
         return self.shift_fn(df)
 
 
-class BlobRegressionDGP:
+class BlobClassificationDGP:
     """
-    Regression DGP: overlapping 2D blobs with a constant target per blob.
+    Binary classification DGP: overlapping 2D blobs, each with its own
+    Bernoulli rate.
 
     Data model
     ----------
-    Blob geometry and per-blob target means are fixed once at construction
+    Blob geometry and per-blob positive rates are fixed once at construction
     (via ``center_seed``), so repeated ``sample(n, seed)`` calls draw i.i.d.
     rows from a *fixed* process — only the per-call ``seed`` varies which
-    blob each row lands in and the within-blob / label noise.
+    blob each row lands in, its coordinates, and its label draw.
 
-    center_j ~ Normal(0, center_std)                for j in 0..n_blobs-1
-    blob_mean_j ~ Uniform(target_low, target_high)   for j in 0..n_blobs-1
+    center_j ~ Normal(0, center_std)         for j in 0..n_blobs-1
+    p_j ~ Uniform(p_low, p_high)              for j in 0..n_blobs-1
 
     row i:
         blob(i) ~ DiscreteUniform(0, n_blobs-1)
         x1, x2 | blob(i) ~ Normal(center_{blob(i)}, blob_std)
         x3 = f"blob_{blob(i)}"
-        y  = blob_mean_{blob(i)} + Normal(0, noise_std)
+        y | blob(i) ~ Bernoulli(p_{blob(i)})
 
     A small ``center_std`` relative to ``blob_std`` makes the blobs overlap
-    heavily, so the model must recover the underlying blob structure from
+    heavily, so the model must recover each blob's positive rate from
     (x1, x2) alone — it never sees x3.
 
     Parameters
@@ -272,18 +273,15 @@ class BlobRegressionDGP:
         each other.
     blob_std : float
         Within-blob standard deviation for x1 and x2.
-    target_low, target_high : float
-        Range of the Uniform distribution each blob's mean target is drawn
-        from.
-    noise_std : float
-        Standard deviation of Gaussian noise added to y on top of the
-        blob's constant mean. Zero means y is exactly piecewise-constant.
+    p_low, p_high : float
+        Range of the Uniform distribution each blob's positive rate
+        (P(y=1)) is drawn from.
     center_seed : int
-        Seed used to fix blob centers and blob means at construction.
+        Seed used to fix blob centers and positive rates at construction.
 
     Examples
     --------
-    >>> dgp = BlobRegressionDGP(n_blobs=10, center_seed=0)
+    >>> dgp = BlobClassificationDGP(n_blobs=10, center_seed=0)
     >>> df = dgp.sample(n=1000, seed=42)
     >>> df.columns.tolist()
     ['y', 'x1', 'x2', 'x3']
@@ -296,33 +294,29 @@ class BlobRegressionDGP:
         n_blobs: int = 10,
         center_std: float = 1.5,
         blob_std: float = 1.0,
-        target_low: float = 0.0,
-        target_high: float = 0.5,
-        noise_std: float = 0.05,
+        p_low: float = 0.0,
+        p_high: float = 0.5,
         center_seed: int = 0,
     ) -> None:
         if n_blobs <= 0:
             raise ValueError(f"n_blobs must be positive, got {n_blobs}")
         if blob_std <= 0:
             raise ValueError(f"blob_std must be positive, got {blob_std}")
-        if target_low >= target_high:
+        if not (0.0 <= p_low < p_high <= 1.0):
             raise ValueError(
-                f"target_low must be < target_high, got {target_low} >= {target_high}"
+                f"require 0 <= p_low < p_high <= 1, got p_low={p_low}, p_high={p_high}"
             )
-        if noise_std < 0:
-            raise ValueError(f"noise_std must be non-negative, got {noise_std}")
 
         self.n_blobs = n_blobs
         self.center_std = center_std
         self.blob_std = blob_std
-        self.target_low = target_low
-        self.target_high = target_high
-        self.noise_std = noise_std
+        self.p_low = p_low
+        self.p_high = p_high
         self.center_seed = center_seed
 
         rng = np.random.default_rng(center_seed)
         self.centers = rng.normal(loc=0.0, scale=center_std, size=(n_blobs, 2))
-        self.blob_means = rng.uniform(target_low, target_high, size=n_blobs)
+        self.blob_probs = rng.uniform(p_low, p_high, size=n_blobs)
         self.blob_ids = [f"blob_{i}" for i in range(n_blobs)]
 
     def sample(self, n: int, seed: int) -> pd.DataFrame:
@@ -334,13 +328,13 @@ class BlobRegressionDGP:
         n : int
             Number of rows.
         seed : int
-            Random seed controlling blob assignment and noise.
+            Random seed controlling blob assignment, coordinates, and label draws.
 
         Returns
         -------
         pd.DataFrame
-            Columns: ``y`` (continuous target), ``x1``, ``x2`` (coordinates),
-            ``x3`` (string blob id).
+            Columns: ``y`` (0/1), ``x1``, ``x2`` (coordinates), ``x3``
+            (string blob id).
         """
         rng = np.random.default_rng(seed)
 
@@ -348,8 +342,6 @@ class BlobRegressionDGP:
         x1 = self.centers[assignment, 0] + rng.normal(0.0, self.blob_std, size=n)
         x2 = self.centers[assignment, 1] + rng.normal(0.0, self.blob_std, size=n)
         x3 = np.array(self.blob_ids)[assignment]
-        y = self.blob_means[assignment]
-        if self.noise_std > 0:
-            y = y + rng.normal(0.0, self.noise_std, size=n)
+        y = rng.binomial(n=1, p=self.blob_probs[assignment])
 
         return pd.DataFrame({"y": y, "x1": x1, "x2": x2, "x3": x3})
