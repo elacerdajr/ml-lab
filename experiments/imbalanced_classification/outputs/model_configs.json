@@ -1,0 +1,54 @@
+{
+  "logistic": {
+    "max_iter": 500
+  },
+  "logistic_balanced": {},
+  "linear_svm": {
+    "max_iter": 2000
+  },
+  "catboost_conservative": {
+    "iterations": 300,
+    "depth": 4,
+    "learning_rate": 0.03,
+    "l2_leaf_reg": 10
+  },
+  "catboost_aggressive": {
+    "iterations": 800,
+    "depth": 7,
+    "learning_rate": 0.05,
+    "l2_leaf_reg": 3
+  },
+  "mlp": {
+    "hidden_layer_sizes": [
+      64,
+      32
+    ],
+    "alpha": 0.0001,
+    "learning_rate_init": 0.001,
+    "max_iter": 200,
+    "soft_label_regressor": false
+  },
+  "rbf_svm": {
+    "max_train_n": 50000,
+    "gamma": "scale",
+    "C": 1.0
+  },
+  "gaussian_process": {
+    "max_train_n": 2000
+  },
+  "rff_logistic": {
+    "gammas": [
+      0.1,
+      1.0
+    ],
+    "n_components": [
+      200,
+      500
+    ],
+    "max_iter": 500,
+    "selected": {
+      "gamma": 0.1,
+      "n_components": 200
+    }
+  }
+}

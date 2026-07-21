@@ -1,4 +1,4 @@
-.PHONY: exp-roc-vs-ap exp-roc-vs-ap-imbalance exp-roc-vs-ap-info exp-embedding-pca exp-rule-viz exp-weak-features exp-weak-features-beta exp-noisy-label-catboost
+.PHONY: exp-roc-vs-ap exp-roc-vs-ap-imbalance exp-roc-vs-ap-info exp-embedding-pca exp-rule-viz exp-weak-features exp-weak-features-beta exp-noisy-label-catboost exp-imbalanced-classification exp-imbalanced-classification-smoke
 
 # Run every experiment through `uv run` so it always uses the locked
 # environment from uv.lock. Override with `PYTHON=` if you want to bypass.
@@ -29,3 +29,9 @@ exp-leaf-embedding-ranking:  ## Leaf-embedding residual ranking: Ridge-on-leaves
 	cd experiments/leaf_embedding_ranking && $(PYTHON) run_experiment.py
 exp-noisy-label-catboost:  ## CatBoost CrossEntropy on noisy soft labels vs Logloss on hard labels, across noise levels
 	cd experiments/noisy_label_catboost && $(PYTHON) run_experiment.py
+
+exp-imbalanced-classification:  ## Rare-positive (0.1%) model comparison: AP vs score entropy, priors, leaf/RFF UMAP
+	cd experiments/imbalanced_classification && uv run --extra catboost --extra umap --extra viz python run_experiment.py
+
+exp-imbalanced-classification-smoke:  ## Fast smoke run of the imbalanced-classification experiment (CI/verification)
+	cd experiments/imbalanced_classification && uv run --extra catboost --extra umap --extra viz python run_experiment.py --smoke

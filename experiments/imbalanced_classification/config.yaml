@@ -1,0 +1,110 @@
+# Imbalanced binary classification experiment — configuration.
+#
+# All scale knobs, seeds and sweeps live here (no hard-coded magic numbers in
+# the package). The `default` profile finishes in a few minutes and produces
+# meaningful outputs; the `full_spec` profile reproduces the literal 1M-row
+# specification and is much heavier. Select with `--profile full_spec`.
+# The `--smoke` flag applies an even smaller override for CI / verification.
+
+seed: 42
+
+# ── Default profile ──────────────────────────────────────────────────────────
+data:
+  n_full: 300_000          # full population size
+  positive_rate: 0.001     # target mean(p) ≈ 0.1% positives
+  cat_1_values: 3
+  cat_2_values: 100
+  cat_2_high_risk: 8       # number of high-risk cat_2 levels
+  num_2_threshold: 0.5     # threshold for the 1.0 * (num_2 > thr) effect
+  noise_sigma: 0.5         # std of the additive logit noise
+
+splits:
+  val_fraction: 0.2
+  test_fraction: 0.2
+  # remainder is train_full
+
+undersample:
+  positive_rate: 0.10      # positives become 10% of train_under
+
+priors:
+  label_smoothing_lambdas: [0.01, 0.05, 0.10, 0.20]
+  synthetic_rhos: [0.05, 0.10, 0.25, 0.50]
+  synthetic_num_perturb: 0.10     # Gaussian perturb scale (× per-feature std)
+  shrinkage_lambdas: [0.01, 0.05, 0.10, 0.20]
+  noise_alphas: [0.90, 0.95, 0.98, 0.99]
+
+models:
+  logistic:
+    max_iter: 500
+  linear_svm:
+    max_iter: 2000
+  rff:
+    gammas: [0.1, 1.0]
+    n_components: [200, 500]
+    max_iter: 500
+  catboost_conservative:
+    iterations: 300
+    depth: 4
+    learning_rate: 0.03
+    l2_leaf_reg: 10
+  catboost_aggressive:
+    iterations: 800
+    depth: 7
+    learning_rate: 0.05
+    l2_leaf_reg: 3
+  rbf_svm:
+    max_train_n: 50_000
+    gamma: scale
+    C: 1.0
+  mlp:
+    hidden_layer_sizes: [64, 32]
+    alpha: 0.0001
+    learning_rate_init: 0.001
+    max_iter: 200
+    soft_label_regressor: false   # optional MLPRegressor approximation for priors 2/3
+  gaussian_process:
+    max_train_n: 2_000     # conceptual smooth benchmark; full_spec raises to 5_000
+
+umap:
+  n_umap: 10_000            # sample size for UMAP panels (default profile)
+  n_neighbors: 30
+  min_dist: 0.1
+
+output:
+  save_preprocessors: true
+  save_linear_models: true
+  save_catboost_models: false   # .cbm dumps are large — off by default
+  bucket_sizes: [10, 20, 100]
+
+# ── Full-spec profile (overrides applied on top of default) ──────────────────
+profiles:
+  full_spec:
+    data:
+      n_full: 1_000_000
+    models:
+      rff:
+        gammas: [0.05, 0.1, 0.5, 1.0]
+        n_components: [200, 500, 1000]
+      gaussian_process:
+        max_train_n: 5_000
+    umap:
+      n_umap: 50_000
+
+  smoke:
+    data:
+      n_full: 20_000
+    priors:
+      label_smoothing_lambdas: [0.10]
+      synthetic_rhos: [0.10]
+      shrinkage_lambdas: [0.10]
+      noise_alphas: [0.95]
+    models:
+      rff:
+        gammas: [1.0]
+        n_components: [200]
+    umap:
+      n_umap: 2_000
+    output:
+      save_preprocessors: false
+      save_linear_models: false
+      save_catboost_models: false
