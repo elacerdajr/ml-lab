@@ -40,12 +40,97 @@ Best candidate for production:       logistic_balanced (AP=0.0298, H=0.812, tie=
 | gaussian_process | 0.0287 | 0.8782 | 0.6437 | 0.0000 | 2.6033 |
 | rff_logistic | 0.0193 | 0.9024 | 0.5711 | 0.0000 | 0.1028 |
 
-## Key plots
+## Plots
 
-- `plots/ap_entropy/ap_vs_entropy.png` — AP vs score smoothness (the core trade-off).
-- `plots/entropy_tradeoff/ap_loss_vs_entropy_gain.png` — cost of injecting ranking noise.
-- `plots/bucket_lift/bucket_lift.png` — decile lift vs the true base rate.
-- `plots/umap/` — raw / CatBoost-leaf / RFF representations, full vs undersampled.
+### AP vs score entropy — the core trade-off
+
+![AP vs entropy](outputs/plots/ap_entropy/ap_vs_entropy.png)
+
+*x = normalized score entropy, y = average precision, point size ∝ train time. Top-right (accurate *and* smooth) is ideal; the dotted line marks the high-entropy threshold (H ≥ 0.80). Tree models sit left (spiky scores), linear / balanced models sit right.*
+
+### Ranking-noise trade-off — headline plot
+
+![AP loss vs entropy gain](outputs/plots/entropy_tradeoff/ap_loss_vs_entropy_gain.png)
+
+*For the deterministic noise score r = αp + (1-α)u: x = entropy gain ΔH = H(r) − H(p), y = AP change ΔAP = AP(r) − AP(p). Points near the top-right buy large smoothness gains for negligible ranking loss; steep drops mean the noise is destroying signal.*
+
+### AP vs training time
+
+![AP vs time](outputs/plots/ap_time/ap_vs_time.png)
+
+*x = log(1 + train time [s]), y = AP, colour = normalized entropy — find the cheapest model at a given accuracy.*
+
+### Bucket lift by score decile
+
+![Bucket lift](outputs/plots/bucket_lift/bucket_lift.png)
+
+*Positive rate per score decile (log y) with the true base-rate line. A good ranker's top decile sits far above the base rate.*
+
+### Precision–recall curves
+
+![Precision-recall](outputs/plots/precision_recall/precision_recall.png)
+
+*PR curves (test, raw probability) — the right diagnostic under heavy imbalance, where ROC-AUC looks deceptively high.*
+
+### Score distributions (per model)
+
+Raw probability vs post-hoc shrinkage vs deterministic-noise ranking score, validation and test, on a log y-axis so the rare high-score tail is visible.
+
+<details><summary>Show per-model score histograms</summary>
+
+![rbf_svm](outputs/plots/score_histograms/score_hist_rbf_svm.png)
+
+*`rbf_svm` — raw vs shrinkage vs noise score.*
+
+![mlp](outputs/plots/score_histograms/score_hist_mlp.png)
+
+*`mlp` — raw vs shrinkage vs noise score.*
+
+![catboost_aggressive](outputs/plots/score_histograms/score_hist_catboost_aggressive.png)
+
+*`catboost_aggressive` — raw vs shrinkage vs noise score.*
+
+![catboost_conservative](outputs/plots/score_histograms/score_hist_catboost_conservative.png)
+
+*`catboost_conservative` — raw vs shrinkage vs noise score.*
+
+![logistic](outputs/plots/score_histograms/score_hist_logistic.png)
+
+*`logistic` — raw vs shrinkage vs noise score.*
+
+![linear_svm](outputs/plots/score_histograms/score_hist_linear_svm.png)
+
+*`linear_svm` — raw vs shrinkage vs noise score.*
+
+![logistic_balanced](outputs/plots/score_histograms/score_hist_logistic_balanced.png)
+
+*`logistic_balanced` — raw vs shrinkage vs noise score.*
+
+![gaussian_process](outputs/plots/score_histograms/score_hist_gaussian_process.png)
+
+*`gaussian_process` — raw vs shrinkage vs noise score.*
+
+![rff_logistic](outputs/plots/score_histograms/score_hist_rff_logistic.png)
+
+*`rff_logistic` — raw vs shrinkage vs noise score.*
+
+</details>
+
+### UMAP representations (full sample vs undersampled)
+
+Each figure pairs the full-population view (positives are a sparse minority) with the 10%-positive undersample the model trains on.
+
+![UMAP raw features](outputs/plots/umap/umap_raw_features.png)
+
+*Raw one-hot + scaled features (euclidean). The model-agnostic view of class separability before any model — full sample (true base rate) vs undersample.*
+
+![UMAP CatBoost leaf](outputs/plots/umap/umap_catboost_leaf.png)
+
+*CatBoost leaf-index one-hot (cosine) — the *supervised* tree view. The rare positive class forms much tighter, more separated structure than in raw space.*
+
+![UMAP RFF features](outputs/plots/umap/umap_rff_features.png)
+
+*Random-Fourier feature space (euclidean) that the RFF+logistic model actually sees.*
 
 See `README.md` for how to interpret each metric and plot.
 
