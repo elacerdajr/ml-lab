@@ -11,7 +11,7 @@ representations with UMAP.
 
 Run via the experiment entry point::
 
-    cd experiments/imbalanced_classification
+    cd experiments/2026-07-21_imbalanced_classification
     uv run --extra catboost --extra umap --extra viz python run_experiment.py
 """
 

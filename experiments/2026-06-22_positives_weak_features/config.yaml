@@ -1,4 +1,4 @@
-# experiments/positives_weak_features/config.yaml
+# experiments/2026-06-22_positives_weak_features/config.yaml
 # ─────────────────────────────────────────────────
 # CatBoost hyperparameter sensitivity study under 1% positive rate.
 #

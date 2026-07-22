@@ -31,7 +31,7 @@ viz = [
     "joblib>=1.3",
     "rich>=13.0",
 ]
-# Sentence-embedding experiment (experiments/embedding_pca).
+# Sentence-embedding experiment (experiments/2026-06-09_embedding_pca).
 embedding = ["sentence-transformers>=2.2"]
 # UMAP dimensionality reduction for leaf-embedding visualisation.
 umap = ["umap-learn>=0.5"]

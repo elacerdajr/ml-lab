@@ -1,5 +1,5 @@
 """
-experiments/positives_weak_features/run_experiment.py
+experiments/2026-06-22_positives_weak_features/run_experiment.py
 ------------------------------------------------------
 Research question
 ~~~~~~~~~~~~~~~~~

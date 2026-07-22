@@ -1,6 +1,6 @@
 # Plan — Weak Features (Beta‑Distributed Informations)
 
-> Experiment folder: `experiments/weak_features_beta/`
+> Experiment folder: `experiments/2026-06-23_weak_features_beta/`
 
 ## Research question
 
@@ -94,7 +94,7 @@ All models see the same 100 features; no feature selection is performed.
 ## Outputs
 
 ```
-experiments/weak_features_beta/outputs/
+experiments/2026-06-23_weak_features_beta/outputs/
 ├── feature_info.csv     # per‑feature info_j values sampled from Beta(1,9)
 ├── scores.csv           # long‑format: model × n_train × repeat × metric
 ├── summary.csv          # mean ± 95% CI per (model, n_train)

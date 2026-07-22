@@ -1,4 +1,4 @@
-# experiments/weak_features_sample_size/config.yaml
+# experiments/2026-06-18_weak_features_sample_size/config.yaml
 # ──────────────────────────────────────────────────
 # Shared settings for the "100 weak features × sample size" experiment.
 # Only the train size is swept (see run_experiment.py); everything else

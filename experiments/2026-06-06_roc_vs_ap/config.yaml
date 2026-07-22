@@ -1,4 +1,4 @@
-# experiments/roc_vs_ap/config.yaml
+# experiments/2026-06-06_roc_vs_ap/config.yaml
 # ──────────────────────────────────
 # Shared settings: data budget, seeds, models, metrics.
 # Study-specific sweeps live in study_imbalance.yaml / study_feature_info.yaml.

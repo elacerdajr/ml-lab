@@ -1,11 +1,22 @@
 # Experiments guide
 
+## Folder naming
+
+Each experiment folder must be named `YYYY-MM-DD_<slug>/`:
+
+- `YYYY-MM-DD` — the date the folder is first added to git (use `date +%Y-%m-%d` when creating it)
+- `<slug>` — a short snake_case description of the research question
+
+Example: `experiments/2026-07-22_my_question/`
+
+---
+
 ## How an experiment is structured
 
-Each experiment lives in `experiments/<name>/` and has three parts:
+Each experiment lives in `experiments/YYYY-MM-DD_<slug>/` and has three parts:
 
 ```
-experiments/roc_vs_ap/
+experiments/2026-06-06_roc_vs_ap/
 ├── config.yaml              # shared defaults (budget, DGP parameters, model settings)
 ├── study_imbalance.yaml     # overrides for Study 1
 ├── study_feature_info.yaml  # overrides for Study 2
@@ -31,7 +42,7 @@ make exp-roc-vs-ap-imbalance     # Study 1: class imbalance sweep
 make exp-roc-vs-ap-info          # Study 2: feature information sweep
 ```
 
-Outputs land in `experiments/roc_vs_ap/outputs/`. The generated `report.md` in that folder summarises the findings.
+Outputs land in `experiments/2026-06-06_roc_vs_ap/outputs/`. The generated `report.md` in that folder summarises the findings.
 
 ---
 
@@ -40,13 +51,13 @@ Outputs land in `experiments/roc_vs_ap/outputs/`. The generated `report.md` in t
 ### Step 1 — create the folder
 
 ```bash
-mkdir -p experiments/my_question/outputs
+mkdir -p experiments/$(date +%Y-%m-%d)_my_question/outputs
 ```
 
 ### Step 2 — write a config file
 
 ```yaml
-# experiments/my_question/config.yaml
+# experiments/2026-07-22_my_question/config.yaml
 
 budget:
   n_train: 4000
@@ -68,7 +79,7 @@ model:
 ### Step 3 — write the script
 
 ```python
-# experiments/my_question/run.py
+# experiments/2026-07-22_my_question/run.py
 
 import yaml
 from pathlib import Path
@@ -79,7 +90,7 @@ from ml_elements import (
     plot_study,
 )
 
-cfg = yaml.safe_load(Path("experiments/my_question/config.yaml").read_text())
+cfg = yaml.safe_load(Path("experiments/2026-07-22_my_question/config.yaml").read_text())
 
 budget = DataBudget(
     n_train=cfg["budget"]["n_train"],
@@ -115,7 +126,7 @@ result  = study.run(trials)
 improv  = study.improvements(result, baseline="baseline", challenger="challenger")
 summary = study.summarize(improv)
 
-out = Path("experiments/my_question/outputs")
+out = Path("experiments/2026-07-22_my_question/outputs")
 summary.to_csv(out / "summary.csv", index=False)
 result.scores.to_csv(out / "scores.csv", index=False)
 
@@ -128,16 +139,17 @@ print("done →", out)
 
 ```makefile
 exp-my-question:
-	python experiments/my_question/run.py
+	python experiments/2026-07-22_my_question/run.py
 ```
 
 ---
 
 ## Checklist for a clean experiment
 
+- [ ] Folder name starts with `YYYY-MM-DD_` matching the date it was created
 - [ ] All randomness flows through `DataBudget` seeds — no bare `random.seed()` calls
 - [ ] Config values are in YAML, not hardcoded in the script
-- [ ] Outputs go to `experiments/<name>/outputs/`, not the repo root
+- [ ] Outputs go to `experiments/YYYY-MM-DD_<slug>/outputs/`, not the repo root
 - [ ] The script is idempotent — re-running overwrites outputs cleanly
 - [ ] A brief comment at the top of the script states the research question
 
@@ -145,7 +157,7 @@ exp-my-question:
 
 ## Existing experiments
 
-### `roc_vs_ap` — ROC-AUC vs Average Precision
+### `2026-06-06_roc_vs_ap` — ROC-AUC vs Average Precision
 
 **Question**: when and why does optimising for Average Precision over ROC-AUC matter?
 
@@ -155,18 +167,18 @@ exp-my-question:
 
 **Models**: AUC-trained HGB · AP-trained HGB · AP-penalised HGB (composite objective)
 
-**Key findings** (full details in `experiments/roc_vs_ap/outputs/report.md`):
+**Key findings** (full details in `experiments/2026-06-06_roc_vs_ap/outputs/report.md`):
 - ROC-AUC is insensitive to class imbalance; AP is not → in imbalanced settings, optimise for AP
 - AP-penalised model recovers most of the AP gain with fewer trees
 - Specialisation advantage is consistent across feature information levels
 
-### `leaf_embedding_umap` — Leaf-Embedding UMAP Reduction vs Native CatBoost
+### `2026-07-22_leaf_embedding_umap` — Leaf-Embedding UMAP Reduction vs Native CatBoost
 
 **Question**: on an imbalanced binary target with mixed categorical + numerical features, how much downstream classification performance survives compressing a CatBoost model's raw per-tree leaf indices (no one-hot) down to k dimensions with UMAP (Hamming metric), compared to a CatBoost model trained natively on the raw features?
 
 **Setup**: `GaussianBinaryDGP` + `ShiftedDGP` (fixed-edge binning of a subset of features into categorical bins), `p_pos=0.05`, k ∈ {2, 5, 10, 20}, downstream classifiers: logit, SVM, RF, MLP, CatBoost. Also tracks per-classifier training time vs k against the native baseline's fit time.
 
-**Key findings** (full details in `experiments/leaf_embedding_umap/report.md`):
+**Key findings** (full details in `experiments/2026-07-22_leaf_embedding_umap/report.md`):
 - An MLP (or CatBoost, depending on k) trained on the UMAP-reduced leaf embedding nearly matches the native-feature CatBoost baseline, even at low k
 - Downstream classifier choice matters more than k, but doesn't rank purely by model complexity — an RBF-kernel SVM on raw UMAP coordinates is inconsistent and sometimes loses to plain logistic regression
 - Fit time for MLP/RF on the compressed embedding can exceed the native CatBoost baseline's fit time on the full leaf space, despite training on far fewer dimensions

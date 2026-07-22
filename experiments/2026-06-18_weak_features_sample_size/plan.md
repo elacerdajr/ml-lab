@@ -1,6 +1,6 @@
 # Plan — Weak Features × Sample Size
 
-> Experiment folder: `experiments/weak_features_sample_size/`
+> Experiment folder: `experiments/2026-06-18_weak_features_sample_size/`
 
 ## Research question
 
@@ -90,7 +90,7 @@ Fixed across all conditions:
 ## Outputs
 
 ```
-experiments/weak_features_sample_size/outputs/
+experiments/2026-06-18_weak_features_sample_size/outputs/
 ├── scores.csv          # long-format: model × n_train × repeat × metric
 ├── summary.csv         # mean ± 95 % CI per (model, n_train)
 ├── fig_auc_vs_n.png    # AUC vs n_train, one line per model

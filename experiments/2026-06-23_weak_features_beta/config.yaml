@@ -1,4 +1,4 @@
-# experiments/weak_features_beta/config.yaml
+# experiments/2026-06-23_weak_features_beta/config.yaml
 # ──────────────────────────────────────────────────
 # Shared settings for the "100 features, Beta(1,9) info × sample size" experiment.
 # Features receive heterogeneous information levels sampled from Beta(1,9)

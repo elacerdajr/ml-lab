@@ -10,7 +10,7 @@ The input data is `site_descriptions.csv`, with more than 100 rows where each ro
 make exp-embedding-pca
 ```
 
-The script uses `sentence-transformers/all-MiniLM-L6-v2` by default and writes outputs to `experiments/embedding_pca/outputs/`. If optional dependencies are unavailable, it falls back to a deterministic 384-dimensional local hashing sentence embedding so artifacts and a report can still be generated offline.
+The script uses `sentence-transformers/all-MiniLM-L6-v2` by default and writes outputs to `experiments/2026-06-09_embedding_pca/outputs/`. If optional dependencies are unavailable, it falls back to a deterministic 384-dimensional local hashing sentence embedding so artifacts and a report can still be generated offline.
 
 Install the optional runtime dependencies before running the full experiment:
 

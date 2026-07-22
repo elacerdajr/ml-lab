@@ -15,7 +15,7 @@ make exp-imbalanced-classification          # default profile (N_full = 300k, a 
 make exp-imbalanced-classification-smoke    # tiny smoke run for CI / verification
 
 # Or directly, with profile / smoke flags:
-cd experiments/imbalanced_classification
+cd experiments/2026-07-21_imbalanced_classification
 uv run --extra catboost --extra umap --extra viz python run_experiment.py
 uv run --extra catboost --extra umap --extra viz python run_experiment.py --profile full_spec
 uv run --extra catboost --extra umap --extra viz python run_experiment.py --smoke
