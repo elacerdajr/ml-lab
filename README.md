@@ -7,7 +7,7 @@ A personal ML experimentation lab for answering quantitative questions about mod
 | Path | Purpose |
 |---|---|
 | `ml_elements/` | Reusable library — data generators, models, metrics, runners, plots |
-| `experiments/` | Self-contained experiments, each with config + scripts + outputs |
+| `experiments/` | Self-contained experiments (`YYYY-MM-DD_<slug>/`), each with config + scripts + outputs |
 | `notebooks/` | Exploratory notebooks for one-off analysis |
 
 ## The mental model
@@ -45,18 +45,18 @@ make exp-roc-vs-ap-info        # feature information sweep
 > inside the `.venv` that `uv sync` creates — this guarantees the exact
 > locked dependency set recorded in `uv.lock`.
 
-Outputs land in `experiments/roc_vs_ap/outputs/`.
+Outputs land in `experiments/2026-06-06_roc_vs_ap/outputs/`.
 
 ## Docs
 
 - [Concepts & vocabulary](docs/concepts.md) — what each building block does
 - [Quickstart](docs/quickstart.md) — a complete worked example from scratch
 - [Cookbook](docs/cookbook.md) — short recipes for common tasks
-- [Experiments guide](docs/experiments.md) — how to add a new experiment
+- [Experiments guide](docs/experiments.md) — how to add a new experiment (folders named `YYYY-MM-DD_<slug>/`)
 
 ## Current experiments
 
-### ROC-AUC vs Average Precision (`experiments/roc_vs_ap/`)
+### ROC-AUC vs Average Precision (`experiments/2026-06-06_roc_vs_ap/`)
 
 **Question**: when and why does it matter to train on Average Precision instead of ROC-AUC?
 
@@ -66,9 +66,9 @@ Two studies:
 
 Three model setups compared: AUC-trained · AP-trained · AP-penalised (composite objective reduces tree count).
 
-Results are in `experiments/roc_vs_ap/outputs/report.md`.
+Results are in `experiments/2026-06-06_roc_vs_ap/outputs/report.md`.
 
-### Embedding PCA reconstruction (`experiments/embedding_pca/`)
+### Embedding PCA reconstruction (`experiments/2026-06-09_embedding_pca/`)
 
 **Question**: how many PCA dimensions are needed to reproduce a medium-sized sentence embedding space for diverse website descriptions?
 

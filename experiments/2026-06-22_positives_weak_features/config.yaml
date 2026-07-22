@@ -1,0 +1,71 @@
+# experiments/2026-06-22_positives_weak_features/config.yaml
+# ─────────────────────────────────────────────────
+# CatBoost hyperparameter sensitivity study under 1% positive rate.
+#
+# Motivation: with very few positives and many negatives, model AP can
+# vary substantially just because of which random noise features happen
+# to correlate with positives in the training draw.  We sweep CatBoost
+# depth × L2 regularization to find which hyperparameter choices amplify
+# vs. suppress the influence of the noise features.
+#
+# All three splits are sampled ONCE and held fixed.  Every hyperparameter
+# configuration sees the exact same data, so metric differences are
+# attributable solely to the hyperparameter choices.
+
+experiment:
+  name: positives_weak_features
+  description: >
+    At 1% positives, sweep CatBoost depth × L2 regularization across
+    fixed train/eval/test splits. Features = 20 weak (info=0.10) + 20
+    noise (info=0.0). Goal: identify which hyperparameters amplify or
+    suppress the effect of the random noise features.
+
+# ── DGP ───────────────────────────────────────────────────────────────────
+# Informative features: x00–x19, separation 0.10 (weak but non-zero).
+# Noise features:       x20–x39, separation 0.00 (pure random noise).
+dgp:
+  p_pos: 0.01
+  sigma: 1.0
+  n_informative: 20
+  n_noise: 20
+  info_informative: 0.10
+  info_noise: 0.0
+
+# ── Fixed data splits ─────────────────────────────────────────────────────
+# Expected positive counts at p_pos=0.01:
+#   train:  5000 * 0.01 ≈  50 positives
+#   eval:   2000 * 0.01 ≈  20 positives
+#   test:  10000 * 0.01 ≈ 100 positives
+data:
+  n_train: 5000
+  n_eval: 2000
+  n_test: 10000
+  seeds:
+    train: 101
+    eval: 202
+    test: 303
+
+# ── CatBoost hyperparameter grid ─────────────────────────────────────────
+# 2D sweep: depth × l2_leaf_reg.  iterations and learning_rate are fixed.
+# No early stopping — fit() is called without an eval_set so CatBoost
+# runs the full number of iterations.
+#
+# depth:       shallow trees → fewer features per split → less noise pickup
+# l2_leaf_reg: higher → smaller leaf weights → dampens spurious signal
+sweep:
+  model: catboost
+  iterations: 500
+  learning_rate: 0.05
+  depth: [2, 3, 4, 5, 6, 8]
+  l2_leaf_reg: [1, 3, 10, 30, 100]
+
+# ── Metrics ───────────────────────────────────────────────────────────────
+metrics:
+  - roc_auc
+  - average_precision
+  - brier_score
+  - logloss
+
+# ── Outputs ───────────────────────────────────────────────────────────────
+outputs:
+  dir: outputs

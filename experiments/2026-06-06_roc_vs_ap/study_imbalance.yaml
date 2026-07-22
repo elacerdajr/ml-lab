@@ -1,0 +1,18 @@
+# experiments/2026-06-06_roc_vs_ap/study_imbalance.yaml
+# ───────────────────────────────────────────
+# Study 1 — Effect of class imbalance.
+#
+# Feature information is fixed at the base levels from config.yaml.
+# Positive fraction p_pos is swept from extreme imbalance to balanced.
+
+study:
+  name: imbalance
+  label: "Class Imbalance"
+  condition_col: p_pos
+  xlabel: "Positive Fraction  (p_pos)"
+
+  # Scale applied to config.dgp.info (1.0 = use base values unchanged)
+  info_scale: 1.0
+
+  # Grid of positive-fraction values to sweep
+  p_pos_values: [0.02, 0.05, 0.10, 0.20, 0.35, 0.50]
