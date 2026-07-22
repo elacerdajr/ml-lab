@@ -36,5 +36,5 @@ exp-imbalanced-classification:  ## Rare-positive (0.1%) model comparison: AP vs 
 exp-imbalanced-classification-smoke:  ## Fast smoke run of the imbalanced-classification experiment (CI/verification)
 	cd experiments/imbalanced_classification && uv run --extra catboost --extra umap --extra viz python run_experiment.py --smoke
 
-exp-leaf-embedding-umap:  ## Leaf-index UMAP (Hamming) reduction vs native CatBoost, multiple downstream classifiers, swept over k
+exp-leaf-embedding-umap:  ## Leaf-index UMAP (Hamming) reduction vs native CatBoost: logit/SVM/RF/MLP/CatBoost across k, incl. training time
 	cd experiments/leaf_embedding_umap && uv run --extra catboost --extra umap --extra viz python run_experiment.py

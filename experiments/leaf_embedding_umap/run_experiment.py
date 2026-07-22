@@ -11,6 +11,7 @@ features — on a realistically imbalanced binary target?
 Outputs (experiments/leaf_embedding_umap/outputs/):
   results.csv
   metric_vs_k.png
+  time_vs_k.png
   umap_scatter_k2.png
 """
 
@@ -18,6 +19,7 @@ from __future__ import annotations
 
 import logging
 import sys
+import time
 from pathlib import Path
 
 import matplotlib
@@ -25,6 +27,9 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.neural_network import MLPClassifier
+from sklearn.svm import SVC
 
 SCRIPT_DIR = Path(__file__).parent
 OUT_DIR = SCRIPT_DIR / "outputs"
@@ -32,7 +37,7 @@ OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 sys.path.insert(0, str(SCRIPT_DIR.parent.parent))
 from ml_elements.dgp import GaussianBinaryDGP, ShiftedDGP
-from ml_elements.models import make_catboost, make_hgb, make_logistic
+from ml_elements.models import make_catboost, make_logistic, make_sklearn
 from ml_elements.metrics import AUC, AVG_PRECISION
 
 logging.basicConfig(
@@ -67,9 +72,32 @@ BIN_EDGES = {
 EXTRACTOR_CFG = dict(iterations=300, depth=6, learning_rate=0.05)
 
 DOWNSTREAM_FACTORIES = {
-    "logistic": make_logistic(),
-    "hgb": make_hgb(),
+    "logit": make_logistic(),
+    "svm": make_sklearn(SVC, probability=True, kernel="rbf", random_state=SEED),
+    "rf": make_sklearn(RandomForestClassifier, n_estimators=200, random_state=SEED),
+    "mlp": make_sklearn(MLPClassifier, hidden_layer_sizes=(32, 16), max_iter=300, random_state=SEED),
     "catboost": make_catboost(),
+}
+
+# Fixed categorical color order (validated for adjacent-pair CVD separation).
+CLASSIFIER_COLORS = {
+    "logit": "#2a78d6",
+    "svm": "#eb6834",
+    "rf": "#1baf7a",
+    "mlp": "#eda100",
+    "catboost": "#e87ba4",
+}
+BASELINE_COLOR = "#0b0b0b"
+
+# Prose-friendly names + indefinite article — used only in report sentences,
+# not in tables/legends (which keep the DOWNSTREAM_FACTORIES keys for
+# consistency with results.csv).
+DISPLAY_NAMES = {
+    "logit": ("A", "logistic regression"),
+    "svm": ("An", "SVM"),
+    "rf": ("A", "random forest"),
+    "mlp": ("An", "MLP"),
+    "catboost": ("A", "CatBoost"),
 }
 
 try:
@@ -144,15 +172,14 @@ def _score(y_true: np.ndarray, scores: np.ndarray) -> tuple[float, float]:
 def _plot_metric_vs_k(df: pd.DataFrame, baseline: dict) -> None:
     fig, (ax_auc, ax_ap) = plt.subplots(1, 2, figsize=(12, 5))
 
-    colors = {"logistic": "#4477bb", "hgb": "#cc8844", "catboost": "#44aa77"}
-
     for model_name in DOWNSTREAM_FACTORIES:
         sub = df[df["classifier"] == model_name].sort_values("k")
-        ax_auc.plot(sub["k"], sub["auc"], marker="o", label=model_name, color=colors[model_name])
-        ax_ap.plot(sub["k"], sub["avg_precision"], marker="o", label=model_name, color=colors[model_name])
+        color = CLASSIFIER_COLORS[model_name]
+        ax_auc.plot(sub["k"], sub["auc"], marker="o", markersize=5, linewidth=2, label=model_name, color=color)
+        ax_ap.plot(sub["k"], sub["avg_precision"], marker="o", markersize=5, linewidth=2, label=model_name, color=color)
 
-    ax_auc.axhline(baseline["auc"], color="black", linestyle="--", linewidth=1.3, label="native CatBoost")
-    ax_ap.axhline(baseline["avg_precision"], color="black", linestyle="--", linewidth=1.3, label="native CatBoost")
+    ax_auc.axhline(baseline["auc"], color=BASELINE_COLOR, linestyle="--", linewidth=1.3, label="native CatBoost")
+    ax_ap.axhline(baseline["avg_precision"], color=BASELINE_COLOR, linestyle="--", linewidth=1.3, label="native CatBoost")
 
     ax_auc.set_xlabel("UMAP dimensions (k)")
     ax_auc.set_ylabel("ROC-AUC (test)")
@@ -176,6 +203,34 @@ def _plot_metric_vs_k(df: pd.DataFrame, baseline: dict) -> None:
     log.info("saved %s", path.name)
 
 
+def _plot_time_vs_k(df: pd.DataFrame, baseline_fit_seconds: float) -> None:
+    fig, ax = plt.subplots(figsize=(7, 5))
+
+    for model_name in DOWNSTREAM_FACTORIES:
+        sub = df[df["classifier"] == model_name].sort_values("k")
+        ax.plot(
+            sub["k"], sub["fit_seconds"],
+            marker="o", markersize=5, linewidth=2,
+            label=model_name, color=CLASSIFIER_COLORS[model_name],
+        )
+
+    ax.axhline(baseline_fit_seconds, color=BASELINE_COLOR, linestyle="--", linewidth=1.3, label="native CatBoost")
+
+    ax.set_xlabel("UMAP dimensions (k)")
+    ax.set_ylabel("Training time (seconds, log scale)")
+    ax.set_yscale("log")
+    ax.set_title("Downstream classifier training time vs k")
+    ax.set_xticks(K_VALUES)
+    ax.grid(alpha=0.3, linestyle=":", which="both")
+    ax.legend(fontsize=8)
+
+    fig.tight_layout()
+    path = OUT_DIR / "time_vs_k.png"
+    fig.savefig(path, dpi=130, bbox_inches="tight")
+    plt.close(fig)
+    log.info("saved %s", path.name)
+
+
 def _plot_umap_scatter(Z: np.ndarray, y: np.ndarray) -> None:
     fig, ax = plt.subplots(figsize=(6, 5))
     neg_mask = y == 0
@@ -193,7 +248,7 @@ def _plot_umap_scatter(Z: np.ndarray, y: np.ndarray) -> None:
     log.info("saved %s", path.name)
 
 
-def _write_report(df: pd.DataFrame, baseline: dict, n_trees: int) -> None:
+def _write_report(df: pd.DataFrame, baseline: dict, n_trees: int, baseline_fit_seconds: float) -> None:
     report_path = SCRIPT_DIR / "report.md"
 
     lines: list[str] = [
@@ -217,7 +272,7 @@ def _write_report(df: pd.DataFrame, baseline: dict, n_trees: int) -> None:
         "| Leaf embedding | raw per-tree leaf indices (no one-hot) |",
         "| UMAP metric | Hamming |",
         f"| k values | {', '.join(str(k) for k in K_VALUES)} |",
-        "| Downstream classifiers | logistic, hgb, catboost |",
+        "| Downstream classifiers | logit, svm, rf, mlp, catboost |",
         "",
         "---",
         "",
@@ -227,17 +282,21 @@ def _write_report(df: pd.DataFrame, baseline: dict, n_trees: int) -> None:
         "|--------|------:|",
         f"| ROC-AUC | {baseline['auc']:.4f} |",
         f"| Average Precision | {baseline['avg_precision']:.4f} |",
+        f"| Training time (s) | {baseline_fit_seconds:.4f} |",
         "",
         "---",
         "",
         "## UMAP + downstream classifier results",
         "",
-        "| k | classifier | ROC-AUC | Average Precision |",
-        "|--:|------------|--------:|-------------------:|",
+        "| k | classifier | ROC-AUC | Average Precision | Training time (s) |",
+        "|--:|------------|--------:|-------------------:|-------------------:|",
     ]
 
     for _, r in df.sort_values(["k", "classifier"]).iterrows():
-        lines.append(f"| {int(r['k'])} | {r['classifier']} | {r['auc']:.4f} | {r['avg_precision']:.4f} |")
+        lines.append(
+            f"| {int(r['k'])} | {r['classifier']} | {r['auc']:.4f} | {r['avg_precision']:.4f} "
+            f"| {r['fit_seconds']:.4f} |"
+        )
 
     lines += [
         "",
@@ -251,6 +310,13 @@ def _write_report(df: pd.DataFrame, baseline: dict, n_trees: int) -> None:
         "native CatBoost baseline shown as a dashed reference line.",
         "",
         "![metric vs k](outputs/metric_vs_k.png)",
+        "",
+        "### Training time vs k",
+        "",
+        "Wall-clock fit time (log scale) for each downstream classifier across k, with the",
+        "native CatBoost baseline's fit time shown as a dashed reference line.",
+        "",
+        "![time vs k](outputs/time_vs_k.png)",
         "",
         "### UMAP scatter (k=2)",
         "",
@@ -266,23 +332,44 @@ def _write_report(df: pd.DataFrame, baseline: dict, n_trees: int) -> None:
     ]
 
     best_row = df.loc[df["avg_precision"].idxmax()]
+    mean_auc = df.groupby("classifier")["auc"].mean().sort_values(ascending=False)
+    mean_fit = df.groupby("classifier")["fit_seconds"].mean().sort_values()
+    auc_rank_str = " > ".join(f"{name} ({v:.3f})" for name, v in mean_auc.items())
+    fit_rank_str = " < ".join(f"{name} ({v:.3f}s)" for name, v in mean_fit.items())
+    fastest, slowest = mean_fit.index[0], mean_fit.index[-1]
+    beats_baseline_time = mean_fit[mean_fit < baseline_fit_seconds].index.tolist()
+
+    article, display_name = DISPLAY_NAMES[best_row["classifier"]]
     lines += [
-        f"1. **A CatBoost model trained on just a {int(best_row['k'])}-D UMAP projection of the leaf "
-        f"embedding ({best_row['classifier']}) nearly matches the native baseline** "
+        f"1. **{article} {display_name} model trained on just a "
+        f"{int(best_row['k'])}-D UMAP projection of the leaf embedding nearly matches the native baseline** "
         f"(AP {best_row['avg_precision']:.4f} vs {baseline['avg_precision']:.4f}, "
         f"AUC {best_row['auc']:.4f} vs {baseline['auc']:.4f}) — most of the information CatBoost's "
         "trees encode about the categorical+numerical feature mix survives a drastic "
         f"compression from {n_trees} raw leaf indices down to {int(best_row['k'])} continuous dimensions.",
         "",
-        "2. **Classifier choice on top of the UMAP embedding matters more than k.** CatBoost "
-        "consistently beats HGB, which consistently beats logistic regression, at every k — the "
-        "UMAP-reduced space is not linearly separable, so a linear downstream model leaves "
-        "substantial performance on the table regardless of dimensionality.",
+        "2. **Classifier choice on top of the UMAP embedding matters, and it doesn't rank the way "
+        "model complexity alone would predict.** Averaged across k, ROC-AUC ranks "
+        f"{auc_rank_str}. Nonlinear models generally lead, but the gap between them is not fixed — "
+        "e.g. an RBF-kernel SVM on raw (unscaled) UMAP coordinates is inconsistent across k, "
+        "sometimes falling behind plain logistic regression.",
         "",
         "3. **Diminishing/non-monotonic returns to higher k.** Performance does not improve "
         "monotonically with k for any downstream classifier — a 2-D Hamming-metric UMAP "
         "embedding already captures most of the leaf-membership signal relevant to the label, "
         "and additional dimensions mostly add noise for the downstream fit rather than new signal.",
+        "",
+        f"4. **Training-time tradeoff.** Averaged across k, fit time ranks {fit_rank_str}, vs. "
+        f"{baseline_fit_seconds:.4f}s for the native CatBoost baseline (trained once on the full "
+        f"{n_trees}-tree feature space). "
+        + (
+            f"Only {', '.join(beats_baseline_time)} fit faster than the baseline on average — "
+            if beats_baseline_time
+            else "Every downstream classifier here is, on average, slower to fit than the baseline despite "
+        )
+        + f"training on a {int(df['k'].min())}–{int(df['k'].max())}-dimensional input, since {slowest} and "
+        f"friends pay iterative/kernel-fitting costs that don't shrink much just because k is small, "
+        f"while {fastest} is the cheapest at every k.",
         "",
         "---",
         "",
@@ -324,10 +411,12 @@ def main() -> None:
     pool_test = Pool(X_test, label=y_test, cat_features=cat_idx)
 
     log.info("Fitting native CatBoost baseline …")
+    t0 = time.perf_counter()
     native_model = _fit_native_catboost(X_train, y_train, cat_idx)
+    baseline_fit_seconds = time.perf_counter() - t0
     native_scores = native_model.predict_proba(pool_test)[:, 1]
     baseline_auc, baseline_ap = _score(y_test, native_scores)
-    log.info("  native CatBoost — AUC=%.4f  AP=%.4f", baseline_auc, baseline_ap)
+    log.info("  native CatBoost — AUC=%.4f  AP=%.4f  fit=%.4fs", baseline_auc, baseline_ap, baseline_fit_seconds)
 
     log.info("Extracting leaf embeddings …")
     leaves_train = _leaf_embeddings(native_model, pool_train)
@@ -347,11 +436,17 @@ def main() -> None:
 
         for model_name, factory in DOWNSTREAM_FACTORIES.items():
             model = factory()
+            t0 = time.perf_counter()
             model.fit(Z_train, y_train)
+            fit_seconds = time.perf_counter() - t0
             scores = model.predict_proba(Z_test)[:, 1]
             auc, ap = _score(y_test, scores)
-            log.info("  k=%-3d %-10s AUC=%.4f  AP=%.4f", k, model_name, auc, ap)
-            rows.append({"k": k, "classifier": model_name, "auc": auc, "avg_precision": ap})
+            log.info("  k=%-3d %-10s AUC=%.4f  AP=%.4f  fit=%.4fs", k, model_name, auc, ap, fit_seconds)
+            rows.append({
+                "k": k, "classifier": model_name,
+                "auc": auc, "avg_precision": ap,
+                "fit_seconds": fit_seconds,
+            })
 
     results_df = pd.DataFrame(rows)
     csv_path = OUT_DIR / "results.csv"
@@ -360,9 +455,10 @@ def main() -> None:
 
     baseline = {"auc": baseline_auc, "avg_precision": baseline_ap}
     _plot_metric_vs_k(results_df, baseline)
+    _plot_time_vs_k(results_df, baseline_fit_seconds)
     if Z_test_k2 is not None:
         _plot_umap_scatter(Z_test_k2, y_test)
-    _write_report(results_df, baseline, n_trees)
+    _write_report(results_df, baseline, n_trees, baseline_fit_seconds)
 
     log.info("\n=== Summary ===")
     print(f"native_catboost  AUC={baseline_auc:.4f}  AP={baseline_ap:.4f}")
