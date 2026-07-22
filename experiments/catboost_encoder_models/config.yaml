@@ -1,0 +1,71 @@
+# CatBoost-style ordered target encoding, compared across models.
+#
+# Uses category_encoders.CatBoostEncoder (an external, ordered/permutation-based
+# target encoding inspired by CatBoost's own "Ordered TS" categorical handling)
+# as the single encoder, crossed with a broader model roster than the sibling
+# experiments: Logistic Regression, RBF SVM, Random Forest, MLP, and CatBoost
+# itself — run twice, once fed the encoded features like everyone else
+# (catboost_encoded) and once via its own native categorical handling
+# (catboost_native), to test whether the external encoding matches, beats, or
+# underperforms CatBoost's internal algorithm.
+#
+# Same data-generating process and undersampling discipline as
+# experiments/imbalanced_classification and experiments/encoder_comparison.
+
+seed: 42
+
+data:
+  n_full: 300_000
+  positive_rate: 0.001
+  cat_1_values: 3
+  cat_2_values: 100
+  cat_2_high_risk: 8
+  num_2_threshold: 0.5
+  noise_sigma: 0.5
+
+splits:
+  val_fraction: 0.2
+  test_fraction: 0.2
+
+undersample:
+  positive_rate: 0.10
+
+encoder:
+  sigma: null        # CatBoostEncoder additive Gaussian noise (regularization); null = none
+  a: 1                # additive smoothing (prior strength)
+
+models:
+  logistic:
+    max_iter: 500
+  rbf_svm:
+    gamma: scale
+    C: 1.0
+    max_train_n: 50_000   # guard: skip if train_under exceeds this
+  random_forest:
+    n_estimators: 300
+    max_depth: 8
+    min_samples_leaf: 5
+  mlp:
+    hidden_layer_sizes: [64, 32]
+    alpha: 0.0001
+    learning_rate_init: 0.001
+    max_iter: 200
+  catboost:
+    iterations: 300
+    depth: 4
+    learning_rate: 0.03
+    l2_leaf_reg: 10
+
+output:
+  save_preprocessors: true
+
+profiles:
+  full_spec:
+    data:
+      n_full: 1_000_000
+
+  smoke:
+    data:
+      n_full: 20_000
+    output:
+      save_preprocessors: false

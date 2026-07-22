@@ -1,4 +1,4 @@
-.PHONY: exp-roc-vs-ap exp-roc-vs-ap-imbalance exp-roc-vs-ap-info exp-embedding-pca exp-rule-viz exp-weak-features exp-weak-features-beta exp-noisy-label-catboost exp-imbalanced-classification exp-imbalanced-classification-smoke exp-encoder-comparison exp-encoder-comparison-smoke
+.PHONY: exp-roc-vs-ap exp-roc-vs-ap-imbalance exp-roc-vs-ap-info exp-embedding-pca exp-rule-viz exp-weak-features exp-weak-features-beta exp-noisy-label-catboost exp-imbalanced-classification exp-imbalanced-classification-smoke exp-encoder-comparison exp-encoder-comparison-smoke exp-catboost-encoder-models exp-catboost-encoder-models-smoke
 
 # Run every experiment through `uv run` so it always uses the locked
 # environment from uv.lock. Override with `PYTHON=` if you want to bypass.
@@ -41,3 +41,9 @@ exp-encoder-comparison:  ## Compare categorical encoders (onehot/ordinal/frequen
 
 exp-encoder-comparison-smoke:  ## Fast smoke run of the encoder-comparison experiment (CI/verification)
 	cd experiments/encoder_comparison && uv run --extra catboost python run_experiment.py --smoke
+
+exp-catboost-encoder-models:  ## CatBoost-style ordered target encoding (category_encoders) x logit/RBF-SVM/RF/MLP/CatBoost
+	cd experiments/catboost_encoder_models && uv run --extra catboost --extra category_encoders python run_experiment.py
+
+exp-catboost-encoder-models-smoke:  ## Fast smoke run of the catboost-encoder-models experiment (CI/verification)
+	cd experiments/catboost_encoder_models && uv run --extra catboost --extra category_encoders python run_experiment.py --smoke

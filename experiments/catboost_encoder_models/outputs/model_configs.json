@@ -1,0 +1,40 @@
+{
+  "logistic": {
+    "max_iter": 500
+  },
+  "rbf_svm": {
+    "gamma": "scale",
+    "C": 1.0,
+    "max_train_n": 50000
+  },
+  "random_forest": {
+    "n_estimators": 300,
+    "max_depth": 8,
+    "min_samples_leaf": 5
+  },
+  "mlp": {
+    "hidden_layer_sizes": [
+      64,
+      32
+    ],
+    "alpha": 0.0001,
+    "learning_rate_init": 0.001,
+    "max_iter": 200
+  },
+  "catboost_encoded": {
+    "iterations": 300,
+    "depth": 4,
+    "learning_rate": 0.03,
+    "l2_leaf_reg": 10
+  },
+  "catboost_native": {
+    "iterations": 300,
+    "depth": 4,
+    "learning_rate": 0.03,
+    "l2_leaf_reg": 10
+  },
+  "encoder": {
+    "sigma": null,
+    "a": 1
+  }
+}

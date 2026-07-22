@@ -35,6 +35,8 @@ viz = [
 embedding = ["sentence-transformers>=2.2"]
 # UMAP dimensionality reduction for leaf-embedding visualisation.
 umap = ["umap-learn>=0.5"]
+# CatBoostEncoder and other ordered/target-style categorical encoders.
+category_encoders = ["category_encoders>=2.6"]
 # Convenience aggregator: install everything.
 all = [
     "catboost>=1.2",
@@ -43,6 +45,7 @@ all = [
     "rich>=13.0",
     "sentence-transformers>=2.2",
     "umap-learn>=0.5",
+    "category_encoders>=2.6",
 ]
 
 [project.urls]
