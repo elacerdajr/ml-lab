@@ -159,3 +159,15 @@ exp-my-question:
 - ROC-AUC is insensitive to class imbalance; AP is not → in imbalanced settings, optimise for AP
 - AP-penalised model recovers most of the AP gain with fewer trees
 - Specialisation advantage is consistent across feature information levels
+
+### `leaf_embedding_umap` — Leaf-Embedding UMAP Reduction vs Native CatBoost
+
+**Question**: on an imbalanced binary target with mixed categorical + numerical features, how much downstream classification performance survives compressing a CatBoost model's raw per-tree leaf indices (no one-hot) down to k dimensions with UMAP (Hamming metric), compared to a CatBoost model trained natively on the raw features?
+
+**Setup**: `GaussianBinaryDGP` + `ShiftedDGP` (fixed-edge binning of a subset of features into categorical bins), `p_pos=0.05`, k ∈ {2, 5, 10, 20}, downstream classifiers: logit, SVM, RF, MLP, CatBoost. Also tracks per-classifier training time vs k against the native baseline's fit time.
+
+**Key findings** (full details in `experiments/leaf_embedding_umap/report.md`):
+- An MLP (or CatBoost, depending on k) trained on the UMAP-reduced leaf embedding nearly matches the native-feature CatBoost baseline, even at low k
+- Downstream classifier choice matters more than k, but doesn't rank purely by model complexity — an RBF-kernel SVM on raw UMAP coordinates is inconsistent and sometimes loses to plain logistic regression
+- Fit time for MLP/RF on the compressed embedding can exceed the native CatBoost baseline's fit time on the full leaf space, despite training on far fewer dimensions
+- Returns to higher k are non-monotonic — a 2-D projection already captures most of the leaf-membership signal

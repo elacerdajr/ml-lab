@@ -1,4 +1,4 @@
-.PHONY: exp-roc-vs-ap exp-roc-vs-ap-imbalance exp-roc-vs-ap-info exp-embedding-pca exp-rule-viz exp-weak-features exp-weak-features-beta exp-noisy-label-catboost exp-imbalanced-classification exp-imbalanced-classification-smoke
+.PHONY: exp-roc-vs-ap exp-roc-vs-ap-imbalance exp-roc-vs-ap-info exp-embedding-pca exp-rule-viz exp-weak-features exp-weak-features-beta exp-noisy-label-catboost exp-imbalanced-classification exp-imbalanced-classification-smoke exp-leaf-embedding-umap
 
 # Run every experiment through `uv run` so it always uses the locked
 # environment from uv.lock. Override with `PYTHON=` if you want to bypass.
@@ -35,3 +35,6 @@ exp-imbalanced-classification:  ## Rare-positive (0.1%) model comparison: AP vs 
 
 exp-imbalanced-classification-smoke:  ## Fast smoke run of the imbalanced-classification experiment (CI/verification)
 	cd experiments/imbalanced_classification && uv run --extra catboost --extra umap --extra viz python run_experiment.py --smoke
+
+exp-leaf-embedding-umap:  ## Leaf-index UMAP (Hamming) reduction vs native CatBoost: logit/SVM/RF/MLP/CatBoost across k, incl. training time
+	cd experiments/leaf_embedding_umap && uv run --extra catboost --extra umap --extra viz python run_experiment.py
