@@ -1,0 +1,43 @@
+{
+  "profile": "default",
+  "seed": 42,
+  "target_positive_rate": 0.001,
+  "pi_true_train_base_rate": 0.0009666666666666667,
+  "features": {
+    "categorical": [
+      "cat_1",
+      "cat_2"
+    ],
+    "numerical": [
+      "num_1",
+      "num_2"
+    ]
+  },
+  "cat_1_values": 3,
+  "cat_2_values": 100,
+  "full": {
+    "n": 300000,
+    "n_positive": 290,
+    "positive_rate": 0.0009666666666666667
+  },
+  "train_full": {
+    "n": 180000,
+    "n_positive": 174,
+    "positive_rate": 0.0009666666666666667
+  },
+  "val_full": {
+    "n": 60000,
+    "n_positive": 58,
+    "positive_rate": 0.0009666666666666667
+  },
+  "test_full": {
+    "n": 60000,
+    "n_positive": 58,
+    "positive_rate": 0.0009666666666666667
+  },
+  "train_under": {
+    "n": 1740,
+    "n_positive": 174,
+    "positive_rate": 0.1
+  }
+}

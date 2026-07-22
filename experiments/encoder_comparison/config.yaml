@@ -1,0 +1,63 @@
+# Encoder comparison experiment — configuration.
+#
+# Same data-generating process, seed handling and undersampling discipline as
+# experiments/imbalanced_classification (kept comparable on purpose). This
+# experiment's own variable is the categorical ENCODER, crossed with a small
+# set of models. The `default` profile finishes in well under a minute; the
+# `full_spec` profile reproduces the 1M-row scale; `--smoke` is for CI.
+
+seed: 42
+
+data:
+  n_full: 300_000
+  positive_rate: 0.001
+  cat_1_values: 3
+  cat_2_values: 100
+  cat_2_high_risk: 8
+  num_2_threshold: 0.5
+  noise_sigma: 0.5
+
+splits:
+  val_fraction: 0.2
+  test_fraction: 0.2
+
+undersample:
+  positive_rate: 0.10      # train_under: positives become 10% of training data
+
+encoders:
+  names: [onehot, ordinal, frequency, target, hashing]
+  hashing_n_features: 32   # per categorical column (cat_1 + cat_2 -> 64 hashed dims total)
+  target_smooth: auto      # sklearn TargetEncoder shrinkage; "auto" or a float
+  target_cv: 5             # internal cross-fitting folds (leakage-safe target stats)
+
+models:
+  logistic:
+    max_iter: 500
+  rff:
+    gamma: 0.5
+    n_components: 300
+    max_iter: 500
+  mlp:
+    hidden_layer_sizes: [64, 32]
+    alpha: 0.0001
+    learning_rate_init: 0.001
+    max_iter: 200
+  catboost:
+    iterations: 300
+    depth: 4
+    learning_rate: 0.03
+    l2_leaf_reg: 10
+
+output:
+  save_preprocessors: true
+
+profiles:
+  full_spec:
+    data:
+      n_full: 1_000_000
+
+  smoke:
+    data:
+      n_full: 20_000
+    output:
+      save_preprocessors: false
