@@ -23,7 +23,12 @@ from . import embeddings as emb
 from . import plots, umap_viz
 from .config import Config
 from .data import FEATURES
-from .metrics import compute_bucket_metrics, compute_score_entropy, eval_row
+from .metrics import (
+    compute_bucket_metrics,
+    compute_score_entropy,
+    eval_row,
+    stratified_ratio_table,
+)
 from .models import (
     build_preprocessor,
     build_registry,
@@ -65,6 +70,7 @@ class Results:
     summary: dict
     model_configs: dict
     pi: float
+    gp_ratios: pd.DataFrame | None = None
 
 
 # ── helpers ──────────────────────────────────────────────────────────────────
@@ -261,10 +267,24 @@ def run(cfg: Config, out_dir: Path, log=None) -> Results:
                 bucket_rows.append(bdf)
     buckets_df = pd.concat(bucket_rows, ignore_index=True)
 
+    # 4b. Stratified ratio tables (every model's metrics / Gaussian process's) ---
+    ratio_frames = []
+    for split_name in ("val", "test"):
+        rt = stratified_ratio_table(metrics_df, baseline_model="gaussian_process", split=split_name)
+        if not rt.empty:
+            rt.insert(0, "eval_split", split_name)
+            ratio_frames.append(rt)
+    ratio_df = pd.concat(ratio_frames, ignore_index=True) if ratio_frames else pd.DataFrame()
+
     # 5. Save tables ---------------------------------------------------------
     metrics_df.to_csv(out_dir / "metrics.csv", index=False)
     buckets_df.to_csv(out_dir / "bucket_metrics.csv", index=False)
-    log.saved(f"metrics.csv ({len(metrics_df)} rows), bucket_metrics.csv ({len(buckets_df)} rows)")
+    if not ratio_df.empty:
+        ratio_df.to_csv(out_dir / "gp_ratio_metrics.csv", index=False)
+    log.saved(
+        f"metrics.csv ({len(metrics_df)} rows), bucket_metrics.csv ({len(buckets_df)} rows), "
+        f"gp_ratio_metrics.csv ({len(ratio_df)} rows)"
+    )
 
     # 6. Plots ---------------------------------------------------------------
     log.section("Plots")
@@ -280,7 +300,7 @@ def run(cfg: Config, out_dir: Path, log=None) -> Results:
     # 8. Artifacts -----------------------------------------------------------
     _save_artifacts(cfg, pre_emb, kept, out_dir / "artifacts", log)
 
-    return Results(metrics_df, buckets_df, summary, model_configs, pi)
+    return Results(metrics_df, buckets_df, summary, model_configs, pi, ratio_df)
 
 
 # ── plotting orchestration ───────────────────────────────────────────────────

@@ -14,6 +14,8 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
+import pandas as pd
+
 from .config import load_config
 from .runner import Results, final_report, run
 
@@ -127,6 +129,37 @@ def _plots_section(out_dir: Path, model_order: list[str]) -> list[str]:
     return lines
 
 
+def _ratio_table_section(gp_ratios) -> list[str]:
+    """Render the Gaussian-process-relative ratio tables (one per eval split)."""
+    if gp_ratios is None or gp_ratios.empty:
+        return []
+    cols = ["model_name", "average_precision", "roc_auc", "log_loss", "brier_score",
+            "normalized_score_entropy", "tie_rate", "train_time_seconds"]
+    cols = [c for c in cols if c in gp_ratios.columns]
+    lines = [
+        "## Metrics relative to Gaussian process (ratio tables)",
+        "",
+        "Every cell is `model_metric / gaussian_process_metric` for that split "
+        "(prior=none, raw score). The Gaussian process row is always 1.000. Ratios "
+        ">1 beat the GP on *higher-is-better* metrics (AP, AUC, entropy) and *lose* "
+        "to it on *lower-is-better* ones (log_loss, brier_score, train_time); read "
+        "each column against its own direction. NaN means the GP's value was 0 "
+        "(e.g. its `tie_rate`), so the ratio is undefined.",
+        "",
+    ]
+    for split_name, sub in gp_ratios.groupby("eval_split"):
+        header = "| " + " | ".join(cols) + " |"
+        sep = "|" + "|".join(["---"] * len(cols)) + "|"
+        body = []
+        for _, r in sub[cols].iterrows():
+            cells = [str(r["model_name"])] + [
+                "n/a" if pd.isna(r[c]) else f"{r[c]:.3f}×" for c in cols[1:]
+            ]
+            body.append("| " + " | ".join(cells) + " |")
+        lines += [f"### {split_name}", "", header, sep, *body, ""]
+    return lines
+
+
 def _write_report(results: Results, report_text: str, out_dir: Path, path: Path) -> None:
     s = results.summary
     raw_test = results.metrics[
@@ -175,6 +208,7 @@ def _write_report(results: Results, report_text: str, out_dir: Path, path: Path)
         "",
         table,
         "",
+        *_ratio_table_section(results.gp_ratios),
         *_plots_section(out_dir, model_order),
         "See `README.md` for how to interpret each metric and plot.",
         "",

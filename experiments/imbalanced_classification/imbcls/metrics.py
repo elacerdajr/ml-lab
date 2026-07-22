@@ -16,6 +16,7 @@ compute_score_gap_metrics  max gap between adjacent sorted scores.
 compute_classification_metrics  AP / AUC / log-loss / Brier (log-loss & Brier gated).
 eval_row                Assemble one metrics.csv row.
 compute_bucket_metrics  Per-bucket lift table for operational ranking.
+stratified_ratio_table  Every model's metrics as ratios to a baseline model.
 """
 
 from __future__ import annotations
@@ -26,6 +27,24 @@ import pandas as pd
 from ml_elements.metrics import AUC, AVG_PRECISION, BRIER, LOGLOSS
 
 N_ENTROPY_BINS = 50
+
+# Metrics that make sense to express as a ratio to a baseline model. For
+# "higher is better" metrics (AP, AUC, entropy) a ratio > 1 beats the baseline;
+# for "lower is better" metrics (log_loss, brier, times) a ratio < 1 beats it.
+RATIO_METRICS = [
+    "average_precision",
+    "roc_auc",
+    "log_loss",
+    "brier_score",
+    "score_entropy",
+    "normalized_score_entropy",
+    "tie_rate",
+    "n_unique_scores",
+    "occupied_bins",
+    "max_score_gap",
+    "train_time_seconds",
+    "predict_time_seconds",
+]
 
 
 def compute_score_entropy(scores: np.ndarray, bins: int = N_ENTROPY_BINS) -> tuple[float, float]:
@@ -141,3 +160,62 @@ def compute_bucket_metrics(
             }
         )
     return pd.DataFrame(rows)
+
+
+def stratified_ratio_table(
+    metrics_df: pd.DataFrame,
+    baseline_model: str = "gaussian_process",
+    *,
+    split: str = "test",
+    prior_method: str = "none",
+    score_transform: str = "raw",
+    columns: list[str] | None = None,
+) -> pd.DataFrame:
+    """
+    Express every model's metrics as ratios to a baseline model's metrics.
+
+    Each cell is ``model_metric / baseline_metric`` for the given evaluation
+    slice (default: prior=none, raw score, test split). The baseline model's row
+    is 1.0 across the board. Where the baseline metric is 0 (e.g. a Gaussian
+    process has ``tie_rate == 0``), the ratio is undefined and returned as NaN.
+
+    Parameters
+    ----------
+    metrics_df : pandas.DataFrame
+        The full metrics table.
+    baseline_model : str
+        Model whose metrics form the denominator.
+    split, prior_method, score_transform : str
+        Slice of ``metrics_df`` to compare within.
+    columns : list of str, optional
+        Metric columns to ratio (defaults to :data:`RATIO_METRICS`).
+
+    Returns
+    -------
+    pandas.DataFrame
+        One row per model (``model_name`` + ratio columns), sorted by the
+        ``average_precision`` ratio descending. Empty if the slice or baseline
+        is missing.
+    """
+    cols = [c for c in (columns or RATIO_METRICS) if c in metrics_df.columns]
+    sub = metrics_df[
+        (metrics_df.prior_method == prior_method)
+        & (metrics_df.score_transform == score_transform)
+        & (metrics_df.eval_split == split)
+    ]
+    if sub.empty or baseline_model not in set(sub.model_name):
+        return pd.DataFrame()
+
+    base = sub[sub.model_name == baseline_model].iloc[0]
+    rows = []
+    for _, r in sub.iterrows():
+        row: dict = {"model_name": r["model_name"]}
+        for c in cols:
+            denom = base[c]
+            row[c] = (r[c] / denom) if pd.notna(denom) and denom != 0 else np.nan
+        rows.append(row)
+
+    out = pd.DataFrame(rows)
+    if "average_precision" in out.columns:
+        out = out.sort_values("average_precision", ascending=False)
+    return out.reset_index(drop=True)

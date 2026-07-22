@@ -40,6 +40,38 @@ Best candidate for production:       logistic_balanced (AP=0.0298, H=0.812, tie=
 | gaussian_process | 0.0287 | 0.8782 | 0.6437 | 0.0000 | 2.6033 |
 | rff_logistic | 0.0193 | 0.9024 | 0.5711 | 0.0000 | 0.1028 |
 
+## Metrics relative to Gaussian process (ratio tables)
+
+Every cell is `model_metric / gaussian_process_metric` for that split (prior=none, raw score). The Gaussian process row is always 1.000. Ratios >1 beat the GP on *higher-is-better* metrics (AP, AUC, entropy) and *lose* to it on *lower-is-better* ones (log_loss, brier_score, train_time); read each column against its own direction. NaN means the GP's value was 0 (e.g. its `tie_rate`), so the ratio is undefined.
+
+### test
+
+| model_name | average_precision | roc_auc | log_loss | brier_score | normalized_score_entropy | tie_rate | train_time_seconds |
+|---|---|---|---|---|---|---|---|
+| rbf_svm | 1.270× | 1.020× | 0.516× | 0.491× | 0.679× | n/a | 0.083× |
+| mlp | 1.180× | 1.038× | 0.451× | 0.549× | 0.624× | n/a | 0.095× |
+| catboost_aggressive | 1.169× | 1.011× | 0.439× | 0.597× | 0.327× | n/a | 0.589× |
+| catboost_conservative | 1.165× | 1.041× | 0.439× | 0.530× | 0.568× | n/a | 0.274× |
+| logistic | 1.105× | 1.040× | 0.519× | 0.606× | 0.723× | n/a | 0.040× |
+| linear_svm | 1.102× | 1.031× | 0.526× | 0.608× | 0.735× | n/a | 0.022× |
+| logistic_balanced | 1.041× | 1.028× | 2.182× | 3.699× | 1.262× | n/a | 0.009× |
+| gaussian_process | 1.000× | 1.000× | 1.000× | 1.000× | 1.000× | n/a | 1.000× |
+| rff_logistic | 0.673× | 1.028× | 0.635× | 0.609× | 0.887× | n/a | 0.039× |
+
+### val
+
+| model_name | average_precision | roc_auc | log_loss | brier_score | normalized_score_entropy | tie_rate | train_time_seconds |
+|---|---|---|---|---|---|---|---|
+| gaussian_process | 1.000× | 1.000× | 1.000× | 1.000× | 1.000× | n/a | 1.000× |
+| rff_logistic | 0.980× | 1.014× | 0.637× | 0.611× | 0.888× | n/a | 0.039× |
+| logistic | 0.843× | 1.036× | 0.516× | 0.597× | 0.723× | n/a | 0.040× |
+| logistic_balanced | 0.828× | 1.019× | 2.180× | 3.714× | 1.259× | n/a | 0.009× |
+| linear_svm | 0.821× | 1.023× | 0.525× | 0.606× | 0.734× | n/a | 0.022× |
+| rbf_svm | 0.800× | 1.019× | 0.514× | 0.490× | 0.679× | n/a | 0.083× |
+| catboost_conservative | 0.763× | 1.039× | 0.436× | 0.527× | 0.568× | n/a | 0.274× |
+| mlp | 0.701× | 1.032× | 0.452× | 0.549× | 0.625× | n/a | 0.095× |
+| catboost_aggressive | 0.521× | 1.003× | 0.444× | 0.622× | 0.334× | n/a | 0.589× |
+
 ## Plots
 
 ### AP vs score entropy — the core trade-off
