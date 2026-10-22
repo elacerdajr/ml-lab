@@ -9,6 +9,9 @@ build/
 # uv
 .venv/
 
+# CatBoost writes training logs to the working directory
+catboost_info/
+
 
 # Experiment runs under a non-default profile (smoke, full_spec, ...): never the record
 experiments/*/outputs_*/
