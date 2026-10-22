@@ -17,7 +17,8 @@ Each experiment lives in `experiments/YYYY-MM-DD_<slug>/` and has three parts:
 
 ```
 experiments/2026-06-06_roc_vs_ap/
-├── config.yaml              # shared defaults (budget, DGP parameters, model settings)
+├── README.md                # the question and how to run it
+├── config.yaml              # shared defaults (budget, population parameters, model settings)
 ├── study_imbalance.yaml     # overrides for Study 1
 ├── study_feature_info.yaml  # overrides for Study 2
 ├── run_experiment.py        # runs all studies
@@ -79,99 +80,109 @@ mkdir -p experiments/$(date +%Y-%m-%d)_my_question/outputs
 ```yaml
 # experiments/2026-07-22_my_question/config.yaml
 
+seed: 1
+
 budget:
   n_train: 4000
   n_valid: 1000
   n_test: 2000
   n_repeats: 30
 
-dgp:
-  features:
+population:
+  info:
     x1: 0.80
     x2: 0.50
     x3: 0.20
 
+sweep:
+  p_pos: [0.02, 0.05, 0.10, 0.20, 0.50]
+
 model:
-  type: hgb
   learning_rate: 0.05
+
+profiles:
+  smoke:                 # a fast run for checking the script; writes outputs_smoke/
+    budget: {n_train: 500, n_valid: 100, n_test: 500, n_repeats: 3}
 ```
 
 ### Step 3 — write the script
 
 ```python
-# experiments/2026-07-22_my_question/run.py
+# experiments/2026-07-22_my_question/run_experiment.py
+"""Does the weak feature x3 help, and does that depend on class imbalance?"""
+
+import argparse
+from pathlib import Path
 
 import yaml
-from pathlib import Path
+
 from ml_elements import (
-    GaussianBinaryDGP, make_hgb,
-    AUC, AVG_PRECISION,
-    DataBudget, TrialRunner, Study, ManualSearch,
-    plot_study,
+    AUC, AVG_PRECISION, DataBudget, GaussianPopulation, Run, Setup,
+    compare, evaluate, make_hgb, plot_study, record, sweep,
 )
 
-cfg = yaml.safe_load(Path("experiments/2026-07-22_my_question/config.yaml").read_text())
+HERE = Path(__file__).resolve().parent
 
-budget = DataBudget(
-    n_train=cfg["budget"]["n_train"],
-    n_valid=cfg["budget"]["n_valid"],
-    n_test=cfg["budget"]["n_test"],
-    seed_train=1, seed_valid=2, seed_test_base=10_000,
-    n_repeats=cfg["budget"]["n_repeats"],
-)
 
-setups = {
-    "baseline":   ["x1", "x2"],
-    "challenger": ["x1", "x2", "x3"],
-}
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--profile", default="default")
+    args = parser.parse_args()
 
-runner = TrialRunner(
-    setups=setups,
-    model_factory=make_hgb(learning_rate=cfg["model"]["learning_rate"]),
-    metrics=[AUC, AVG_PRECISION],
-    budget=budget,
-)
+    cfg = yaml.safe_load((HERE / "config.yaml").read_text())
+    profiles = cfg.pop("profiles", {})
+    if args.profile != "default":
+        for key, override in profiles[args.profile].items():
+            cfg[key] = {**cfg[key], **override}
 
-study = Study(runner, primary_metric=AVG_PRECISION)
+    run = Run(HERE, profile=args.profile, seed=cfg["seed"], config=cfg)
+    b = cfg["budget"]
+    budget = DataBudget(n_train=b["n_train"], n_valid=b["n_valid"], n_test=b["n_test"],
+                        seed_train=cfg["seed"], seed_valid=cfg["seed"] + 1,
+                        seed_test_base=10_000, n_repeats=b["n_repeats"])
 
-info = cfg["dgp"]["features"]
-trials = ManualSearch(
-    [{"p_pos": p} for p in [0.02, 0.05, 0.10, 0.20, 0.50]],
-    trial_name="p_pos",
-).trials(
-    dgp_fn=lambda p: GaussianBinaryDGP(p_pos=p["p_pos"], info=info)
-)
+    trials = sweep(
+        [{"p_pos": p} for p in cfg["sweep"]["p_pos"]], name="p_pos",
+        population=lambda p: GaussianPopulation(p_pos=p["p_pos"], info=cfg["population"]["info"]),
+    )
+    setups = [Setup("baseline", ["x1", "x2"]), Setup("challenger", ["x1", "x2", "x3"])]
+    result = evaluate(trials, setups, [AUC, AVG_PRECISION], budget,
+                      model=make_hgb(learning_rate=cfg["model"]["learning_rate"]))
+    summary = compare(result, "baseline", "challenger", AVG_PRECISION)
 
-result  = study.run(trials)
-improv  = study.improvements(result, baseline="baseline", challenger="challenger")
-summary = study.summarize(improv)
+    plot_study(summary, metric=AVG_PRECISION).savefig(run.output_dir / "fig_improvement.png")
+    out = record(run, {"summary": summary, "scores": result.scores})
+    print("done →", out)
 
-out = Path("experiments/2026-07-22_my_question/outputs")
-summary.to_csv(out / "summary.csv", index=False)
-result.scores.to_csv(out / "scores.csv", index=False)
 
-fig = plot_study(summary, metric=AVG_PRECISION)
-fig.savefig(out / "fig_improvement.png")
-print("done →", out)
+if __name__ == "__main__":
+    main()
 ```
 
-### Step 4 — add a Makefile target
+Run it from its folder (`cd experiments/... && uv run python run_experiment.py`). Write a `report.md` that answers the question and embeds or names the figures it relies on, then `make track-figures`.
+
+### Step 4 — add a README and a Makefile target
+
+The README states the question, how to run it, and where the answer is. Then:
 
 ```makefile
-exp-my-question:
-	python experiments/2026-07-22_my_question/run.py
+exp-my-question:  ## One line: the question this answers
+	cd experiments/2026-07-22_my_question && $(PYTHON) run_experiment.py
 ```
+
+`make help` lists every target with its `##` description.
 
 ---
 
 ## Checklist for a clean experiment
 
 - [ ] Folder name starts with `YYYY-MM-DD_` matching the date it was created
-- [ ] All randomness flows through `DataBudget` seeds — no bare `random.seed()` calls
+- [ ] `README.md` states the question and the command; `report.md` holds the answer
+- [ ] All randomness flows through seeds in the config — no bare `random.seed()` calls
 - [ ] Config values are in YAML, not hardcoded in the script
-- [ ] Outputs go to `experiments/YYYY-MM-DD_<slug>/outputs/`, not the repo root
-- [ ] The script is idempotent — re-running overwrites outputs cleanly
-- [ ] A brief comment at the top of the script states the research question
+- [ ] Outputs go to `run.output_dir`; only the default profile writes `outputs/`
+- [ ] A same-seed rerun leaves tracked files unchanged, apart from timings
+- [ ] A `make exp-...` target with a `##` description
 
 ---
 
@@ -196,7 +207,7 @@ exp-my-question:
 
 **Question**: on an imbalanced binary target with mixed categorical + numerical features, how much downstream classification performance survives compressing a CatBoost model's raw per-tree leaf indices (no one-hot) down to k dimensions with UMAP (Hamming metric), compared to a CatBoost model trained natively on the raw features?
 
-**Setup**: `GaussianBinaryDGP` + `ShiftedDGP` (fixed-edge binning of a subset of features into categorical bins), `p_pos=0.05`, k ∈ {2, 5, 10, 20}, downstream classifiers: logit, SVM, RF, MLP, CatBoost. Also tracks per-classifier training time vs k against the native baseline's fit time.
+**Setup**: `GaussianPopulation` + `ShiftedPopulation` (fixed-edge binning of a subset of features into categorical bins), `p_pos=0.05`, k ∈ {2, 5, 10, 20}, downstream classifiers: logit, SVM, RF, MLP, CatBoost. Also tracks per-classifier training time vs k against the native baseline's fit time.
 
 **Key findings** (full details in `experiments/2026-07-22_leaf_embedding_umap/report.md`):
 - An MLP (or CatBoost, depending on k) trained on the UMAP-reduced leaf embedding nearly matches the native-feature CatBoost baseline, even at low k

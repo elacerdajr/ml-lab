@@ -6,24 +6,26 @@ A personal ML experimentation lab for answering quantitative questions about mod
 
 | Path | Purpose |
 |---|---|
-| `ml_elements/` | Reusable library — data generators, models, metrics, runners, plots |
+| `ml_elements/` | Reusable library — populations, setups, metrics, evaluation, the experiment record |
 | `experiments/` | Self-contained experiments (`YYYY-MM-DD_<slug>/`), each with config + scripts + outputs |
 | `notebooks/` | Exploratory notebooks for one-off analysis |
+| `tests/` | Tests for `ml_elements` and one end-to-end experiment smoke run |
+| `docs/` | Concepts, quickstart, cookbook, experiments guide; `docs/tasks/` holds evan-agents task records |
 
 ## The mental model
 
-Every experiment has the same four moving parts:
+Every experiment is the same sentence:
 
 ```
-DGP  →  TrialRunner  →  Study  →  Comparator / plots
+sweep → evaluate → compare → record
 ```
 
-1. **DGP** generates labelled data under a specific condition (e.g. `p_pos=0.05`).
-2. **TrialRunner** fits one or more model setups on the same training split and scores them on repeated test draws.
-3. **Study** sweeps a parameter across many `Trial`s and aggregates the scores.
-4. **Comparator** / plots turn the numbers into a statistical answer.
+1. **sweep** turns a parameter space into `Trial`s, each sampling from a **Population** (for example `GaussianPopulation(p_pos=0.05, ...)`).
+2. **evaluate** fits each **Setup** (features + model) on the same training data and scores it with each **Metric** on repeated test draws.
+3. **compare** turns two setups' scores into a per-trial answer.
+4. **record** writes the run's summary and `run_meta.json` for the experiment's **Run**.
 
-Any piece can be swapped independently — different model, different DGP, different metric — without touching the rest.
+Any piece can be swapped independently — different model, population or metric — without touching the rest. See [Concepts](docs/concepts.md).
 
 ## Running an experiment
 
@@ -45,6 +47,11 @@ make exp-roc-vs-ap-info        # feature information sweep
 > inside the `.venv` that `uv sync` creates — this guarantees the exact
 > locked dependency set recorded in `uv.lock`.
 
+```bash
+make help        # every target, including one per experiment
+make check       # lint + tests, about 45 s
+```
+
 Outputs land in `experiments/2026-06-06_roc_vs_ap/outputs/`.
 
 ## Docs
@@ -52,7 +59,7 @@ Outputs land in `experiments/2026-06-06_roc_vs_ap/outputs/`.
 - [Concepts & vocabulary](docs/concepts.md) — what each building block does
 - [Quickstart](docs/quickstart.md) — a complete worked example from scratch
 - [Cookbook](docs/cookbook.md) — short recipes for common tasks
-- [Experiments guide](docs/experiments.md) — how to add a new experiment (folders named `YYYY-MM-DD_<slug>/`)
+- [Experiments guide](docs/experiments.md) — how to add a new experiment, and what counts as its record
 
 ## Current experiments
 

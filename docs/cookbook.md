@@ -1,61 +1,55 @@
 # Cookbook
 
-Short recipes for common tasks. Each snippet assumes `ml_elements` is importable and a `budget` / `runner` / `study` have been set up as in the [quickstart](quickstart.md).
+Short recipes. Each assumes the imports, `budget`, `setups` and `trials` from the [quickstart](quickstart.md).
 
 ---
 
-## Use a composite training objective
+## Compare two different models on the same features
 
-Reduce model complexity while keeping AP high.
+Give each setup its own model factory.
 
 ```python
-from ml_elements import AVG_PRECISION, N_ITER, make_hgb
+from ml_elements import Setup, evaluate, make_catboost, make_logistic
 
-# penalise extra boosting iterations
-objective = AVG_PRECISION - 0.001 * N_ITER
-
-runner = TrialRunner(
-    setups=setups,
-    model_factory=make_hgb(scoring=objective),
-    metrics=[AUC, AVG_PRECISION],
-    budget=budget,
-)
+setups = [
+    Setup("logistic", ["x1", "x2", "x3"], model=make_logistic()),
+    Setup("catboost", ["x1", "x2", "x3"], model=make_catboost(depth=4)),
+]
+result = evaluate(trials, setups, [AUC, AVG_PRECISION], budget)
 ```
 
-`N_ITER` is the number of trees the model actually grew. Penalising it pushes early stopping to kick in sooner, giving a smaller model for a tiny AP cost.
+Setups without a `model` use `evaluate(model=...)`, or the trial's `model_factory` if it has one.
 
 ---
 
-## Compare AUC-trained vs AP-trained models
+## Early stopping on AUC vs AP, or on a penalised objective
 
-Each setup can carry its own model factory as a `(features, factory)` tuple. Setups that only specify a feature list still use the shared `model_factory`.
+`make_hgb` runs a fixed number of rounds unless you ask for early stopping. Only then does `scoring` choose the criterion.
 
 ```python
-from ml_elements import AUC, AVG_PRECISION, make_hgb, TrialRunner
+from ml_elements import AVG_PRECISION, N_ITER, Setup, make_hgb
 
-runner = TrialRunner(
-    setups={
-        "auc_model": (["x1", "x2", "x3"], make_hgb(scoring="roc_auc")),
-        "ap_model":  (["x1", "x2", "x3"], make_hgb(scoring="average_precision")),
-    },
-    model_factory=None,   # every setup supplies its own factory
-    metrics=[AUC, AVG_PRECISION],
-    budget=budget,
-)
+setups = [
+    Setup("auc_stopped", ["x1", "x2"], model=make_hgb(early_stopping=True, scoring="roc_auc")),
+    Setup("ap_stopped", ["x1", "x2"], model=make_hgb(early_stopping=True, scoring="average_precision")),
+    Setup("ap_minus_trees", ["x1", "x2"], model=make_hgb(
+        early_stopping=True, scoring=(AVG_PRECISION - 0.001 * N_ITER).as_scorer())),
+]
 ```
 
-You can also mix the two forms — some setups with a shared factory, one with a custom one:
+`validation_fraction` defaults to 0.1 when early stopping is on. `metric.as_scorer()` turns any `Metric` into an sklearn scorer; lower-is-better metrics are negated, because sklearn maximises.
+
+---
+
+## Penalise model size in the evaluation itself
+
+Model terms (`N_ITER`, `N_LEAVES`, `COEF_L1`, or `Metric(..., on="model")`) read the fitted model, so they work as evaluation metrics too.
 
 ```python
-runner = TrialRunner(
-    setups={
-        "default":  ["x1", "x2"],                                        # uses model_factory
-        "ap_tuned": (["x1", "x2"], make_hgb(scoring="average_precision")), # overrides
-    },
-    model_factory=make_hgb(),
-    metrics=[AUC, AVG_PRECISION],
-    budget=budget,
-)
+from ml_elements import AVG_PRECISION, N_ITER
+
+AP_PENALISED = (AVG_PRECISION - 0.001 * N_ITER).rename("ap_penalised")
+result = evaluate(trials, setups, [AVG_PRECISION, AP_PENALISED], budget, model=make_hgb())
 ```
 
 ---
@@ -63,18 +57,26 @@ runner = TrialRunner(
 ## Custom metric
 
 ```python
-from ml_elements import Metric
-from sklearn.metrics import average_precision_score
 import numpy as np
+from sklearn.metrics import average_precision_score
+from ml_elements import Metric
 
-# AP computed only on the top-k predictions
 def ap_at_k(y_true, y_score, k=200):
     idx = np.argsort(y_score)[::-1][:k]
     return average_precision_score(y_true[idx], y_score[idx])
 
-AP_AT_200 = Metric(name="ap@200", direction="higher", fn=lambda y, p: ap_at_k(y, p, k=200))
+AP_AT_200 = Metric("ap@200", "higher", lambda y, p: ap_at_k(y, p, k=200))
+```
 
-runner = TrialRunner(..., metrics=[AUC, AP_AT_200], ...)
+---
+
+## Keep going when a model fails
+
+Some models (FIGS, greedy rule lists) can fail to fit at small sample sizes. `on_error="record"` records NaN for that setup and continues.
+
+```python
+result = evaluate(trials, setups, metrics, budget, model=make_figs(), on_error="record")
+result.failures        # trial_name, trial_value, setup, stage ("fit" or "score"), error
 ```
 
 ---
@@ -82,151 +84,111 @@ runner = TrialRunner(..., metrics=[AUC, AP_AT_200], ...)
 ## Run on real data
 
 ```python
-from ml_elements import RealDataDGP, Trial
 import pandas as pd
+from ml_elements import ResampledPopulation, Trial
 
 df = pd.read_parquet("data/clickstream.parquet")
-
-dgp   = RealDataDGP(df=df, target_col="click")
-trial = Trial(name="real", value=0.0, dgp=dgp, seed_offset=0)
-
-result = study.run([trial])
+trial = Trial(name="real", value=0.0, population=ResampledPopulation(df, target_col="click"), seed_offset=0)
+result = evaluate(trial, setups, [AUC, AVG_PRECISION], budget, model=make_logistic())
 ```
 
-`RealDataDGP.sample(n, seed)` draws rows with replacement, so repeated test draws still give independent estimates.
+`ResampledPopulation.sample` draws rows with replacement. Train, validation and test draws can therefore share rows, so treat the scores as optimistic.
 
 ---
 
-## Test robustness to covariate shift
+## Score under a shifted population
+
+`evaluate` trains and tests each trial on the same population. To compare against a shifted population, run it as its own trial:
 
 ```python
-from ml_elements import ShiftedDGP, GaussianBinaryDGP
+from ml_elements import GaussianPopulation, ShiftedPopulation, Trial
 
-base = GaussianBinaryDGP(p_pos=0.10, info={"x1": 0.8, "x2": 0.5})
+base = GaussianPopulation(p_pos=0.10, info={"x1": 0.8, "x2": 0.5})
+shifted = ShiftedPopulation(base, shift_fn=lambda df: df.assign(x1=df["x1"] + 1.0))
+trials = [Trial("shift", 0, base, seed_offset=0), Trial("shift", 1, shifted, seed_offset=1)]
+```
 
-# train on base, test on shifted distribution
-shifted = ShiftedDGP(
-    base=base,
-    shift_fn=lambda df: df.assign(x1=df["x1"] + 1.0),
+To train on one population and test on another, score the fitted models yourself:
+
+```python
+result = evaluate(Trial("base", 0, base, seed_offset=0), setups, [AUC], budget, model=make_logistic())
+model = result.trial_results[0].models["with_x3"]
+test = shifted.sample(5_000, seed=99)
+AUC.score(test["y"], model.predict_proba(test[["x1", "x2", "x3"]])[:, 1])
+```
+
+---
+
+## Sweep two parameters with a Sobol design
+
+```python
+trials = sweep(
+    {"p_pos": (0.02, 0.50), "x3_info": (0.00, 1.50)},
+    method="sobol", n=32, seed=0,
+    population=lambda p: GaussianPopulation(
+        p_pos=p["p_pos"], info={"x1": 0.8, "x2": 0.5, "x3": p["x3_info"]}),
 )
+```
 
-trials = [
-    Trial(name="no_shift", value=0, dgp=base,    seed_offset=0),
-    Trial(name="shift",    value=1, dgp=shifted,  seed_offset=0),
-]
+Each trial's parameters are in `trial.params`; `sweep_points(space, method="sobol", n=32)` gives them as a DataFrame. `method="random"` draws uniform points instead.
 
-result = study.run(trials)
+---
+
+## Parallel trials
+
+```python
+result = evaluate(trials, setups, metrics, budget, model=make_hgb(), n_jobs=8)   # needs joblib
 ```
 
 ---
 
-## Sobol grid search over two parameters
+## Per-repeat scores
 
 ```python
-from ml_elements import SobolSearch, GaussianBinaryDGP, make_hgb
-
-trials = SobolSearch(
-    param_space={
-        "p_pos":    (0.02, 0.50),
-        "x3_info":  (0.00, 1.50),
-    },
-    n_points=32,
-    seed=0,
-).trials(
-    dgp_fn=lambda p: GaussianBinaryDGP(
-        p_pos=p["p_pos"],
-        info={"x1": 0.8, "x2": 0.5, "x3": p["x3_info"]},
-    ),
-    model_fn=lambda p: make_hgb(),
-)
-
-result = study.run(trials)
-```
-
-Sobol sampling covers the space more evenly than random, so you get better coverage with the same number of points.
-
----
-
-## Parallel execution
-
-```python
-# requires: pip install joblib
-study = Study(runner, primary_metric=AUC, n_jobs=8)
-result = study.run(trials)   # trials run concurrently
-```
-
----
-
-## Bootstrap significance test
-
-```python
-from ml_elements import Comparator
-
-cmp = Comparator(n_boot=5_000)
-
-# Is the improvement at p_pos=0.05 statistically credible?
-bac = cmp.for_trial(result, trial_value=0.05, baseline="without_x3", challenger="with_x3")
-
-bac.ranking_report()   # P(each setup is best)
-bac.pairwise_report()  # P(challenger > baseline)
-```
-
----
-
-## Access raw per-repeat scores
-
-```python
-# result.scores is a DataFrame with columns:
-#   trial_value, setup, repeat, <metric_name>, ...
-df = result.scores
+df = result.scores           # trial_name, trial_value, repeat, test_seed, setup, features, <metrics>
 df[df["trial_value"] == 0.10].groupby("setup")["auc"].describe()
+
+compare(result, "without_x3", "with_x3", AUC, per_repeat=True)   # one row per repeat
 ```
 
 ---
 
-## Calibration plot
+## Calibration and feature importance
 
 ```python
-from ml_elements import plot_calibration
+from ml_elements import plot_calibration, plot_feature_importance
 
-fig = plot_calibration(result.trial_results[0], setup="with_x3")
-fig.savefig("calibration.png")
+plot_calibration(result.trial_results[0], setup="with_x3").savefig("calibration.png")
+plot_feature_importance(result.trial_results[1], setup="with_x3").savefig("importance.png")
 ```
+
+`plot_feature_importance` needs `feature_importances_` (CatBoost, decision trees) or `coef_` (linear models). `HistGradientBoostingClassifier`, which `make_hgb` builds, has neither; use `sklearn.inspection.permutation_importance` for it.
 
 ---
 
-## Feature importance / coefficients
+## Shrink scores toward the base rate
 
 ```python
-from ml_elements import plot_feature_importance
+from ml_elements import Setup, shrink, SCORE_ENTROPY, TIE_RATE
 
-fig = plot_feature_importance(result.trial_results[1], setup="with_x3")
-fig.savefig("feature_importance.png")
+setups = [
+    Setup("raw", ["x1", "x2"]),
+    Setup("shrunk", ["x1", "x2"], scores=lambda p: shrink(p, pi=0.01, lam=0.2)),
+]
+result = evaluate(trials, setups, [AVG_PRECISION, SCORE_ENTROPY, TIE_RATE], budget, model=make_catboost())
 ```
 
-Works for tree models (`feature_importances_`) and linear models (`coef_`).
+Shrinkage is monotonic, so ranking metrics such as AP do not change; calibration and score-shape metrics do.
 
 ---
 
-## Save and reload a fitted model
+## Leaf embeddings
 
 ```python
-import joblib
+from ml_elements import embed_leaves
 
-model = result.trial_results[2].models["with_x3"]
-joblib.dump(model, "model_p05.pkl")
-
-# later
-model = joblib.load("model_p05.pkl")
-p_hat = model.predict_proba(X_new)[:, 1]
-```
-
----
-
-## Export scores to CSV
-
-```python
-result.scores.to_csv("scores.csv", index=False)
+leaves = embed_leaves(catboost_model, X)                   # (n, n_trees) leaf indices
+one_hot = embed_leaves(catboost_model, X, one_hot=True)    # sparse, e.g. for UMAP(metric="cosine")
 ```
 
 ---
@@ -234,25 +196,6 @@ result.scores.to_csv("scores.csv", index=False)
 ## Quick budget for prototyping
 
 ```python
-from ml_elements import DataBudget
-
-budget = DataBudget.quick()                   # 500 train / 100 valid / 500 test, 10 repeats
+budget = DataBudget.quick()                     # 500 train / 100 valid / 500 test, 10 repeats
 budget = DataBudget.quick(n=2000, n_repeats=20)
-```
-
-Scale up to the full budget only when you're happy with the experiment design.
-
----
-
-## Get mean scores for all metrics in one table
-
-```python
-summary = study.full_summary(result, baseline="without_x3", challenger="with_x3")
-
-# shows AUC and AP for both setups at every trial value
-summary[[
-    "trial_value",
-    "without_x3_auc_mean", "with_x3_auc_mean",
-    "without_x3_average_precision_mean", "with_x3_average_precision_mean",
-]]
 ```
