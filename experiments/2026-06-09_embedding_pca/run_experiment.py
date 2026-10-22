@@ -14,13 +14,11 @@ import importlib.util
 import json
 import math
 import re
-import sys
 from collections.abc import Iterable
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 REPO_ROOT = HERE.parents[1]
-sys.path.insert(0, str(REPO_ROOT))
 
 INSTALL_HINT = "pip install numpy pandas scikit-learn matplotlib pyyaml sentence-transformers"
 REQUIRED_PACKAGES = ["numpy", "pandas", "sklearn", "matplotlib", "yaml", "sentence_transformers"]

@@ -56,12 +56,12 @@ from matplotlib.lines import Line2D
 from sklearn.calibration import calibration_curve
 from sklearn.metrics import average_precision_score, brier_score_loss, roc_auc_score
 
+from ml_elements.dgp import GaussianBinaryDGP
+
 SCRIPT_DIR = Path(__file__).parent
 OUT_DIR = SCRIPT_DIR / "outputs"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
-sys.path.insert(0, str(SCRIPT_DIR.parent.parent))
-from ml_elements.dgp import GaussianBinaryDGP
 
 logging.basicConfig(
     level=logging.INFO,

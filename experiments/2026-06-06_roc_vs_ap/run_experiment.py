@@ -35,7 +35,6 @@ import yaml
 # ── paths ─────────────────────────────────────────────────────────────────────
 SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT  = SCRIPT_DIR.parents[1]          # experiments/2026-06-06_roc_vs_ap/../../ → root
-sys.path.insert(0, str(REPO_ROOT))
 
 # ── stub missing optional dependency so ml_elements imports cleanly ───────────
 _stub = types.ModuleType("bayesian_ap_comparator")

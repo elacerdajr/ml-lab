@@ -27,7 +27,6 @@ Usage
 from __future__ import annotations
 
 import logging
-import sys
 import warnings
 from itertools import product
 from pathlib import Path
@@ -45,7 +44,6 @@ warnings.filterwarnings("ignore")
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parents[1]
-sys.path.insert(0, str(REPO_ROOT))
 
 from ml_elements import (  # noqa: E402
     AUC,

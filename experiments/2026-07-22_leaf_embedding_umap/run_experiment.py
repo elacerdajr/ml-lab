@@ -32,14 +32,14 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.neural_network import MLPClassifier
 from sklearn.svm import SVC
 
+from ml_elements.dgp import GaussianBinaryDGP, ShiftedDGP
+from ml_elements.metrics import AUC, AVG_PRECISION
+from ml_elements.models import make_catboost, make_logistic, make_sklearn
+
 SCRIPT_DIR = Path(__file__).parent
 OUT_DIR = SCRIPT_DIR / "outputs"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
-sys.path.insert(0, str(SCRIPT_DIR.parent.parent))
-from ml_elements.dgp import GaussianBinaryDGP, ShiftedDGP
-from ml_elements.metrics import AUC, AVG_PRECISION
-from ml_elements.models import make_catboost, make_logistic, make_sklearn
 
 logging.basicConfig(
     level=logging.INFO,

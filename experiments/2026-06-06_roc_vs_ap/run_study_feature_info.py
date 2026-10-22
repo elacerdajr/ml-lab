@@ -23,8 +23,6 @@ from pathlib import Path
 
 # ── paths ─────────────────────────────────────────────────────────────────────
 SCRIPT_DIR = Path(__file__).resolve().parent
-sys.path.insert(0, str(SCRIPT_DIR.parents[1]))   # repo root  → ml_elements
-sys.path.insert(0, str(SCRIPT_DIR))              # this dir   → run_experiment
 
 # ── stub missing optional dep (must precede run_experiment import) ─────────────
 _stub = types.ModuleType("bayesian_ap_comparator")

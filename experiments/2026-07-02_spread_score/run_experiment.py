@@ -55,12 +55,12 @@ import pandas as pd
 from scipy.stats import spearmanr
 from sklearn.metrics import pairwise_distances, r2_score
 
+from ml_elements.dgp import GaussianBinaryDGP
+
 SCRIPT_DIR = Path(__file__).parent
 OUT_DIR = SCRIPT_DIR / "outputs"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
-sys.path.insert(0, str(SCRIPT_DIR.parent.parent))
-from ml_elements.dgp import GaussianBinaryDGP
 
 logging.basicConfig(
     level=logging.INFO,

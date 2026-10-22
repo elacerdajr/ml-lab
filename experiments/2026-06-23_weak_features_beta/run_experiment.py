@@ -30,7 +30,6 @@ Usage
 
 from __future__ import annotations
 
-import sys
 import warnings
 from pathlib import Path
 from typing import Any
@@ -44,7 +43,6 @@ warnings.filterwarnings("ignore")
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parents[1]
-sys.path.insert(0, str(REPO_ROOT))
 
 import ml_elements as mle  # noqa: E402
 from ml_elements import (  # noqa: E402
