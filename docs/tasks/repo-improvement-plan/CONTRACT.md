@@ -3,8 +3,8 @@
 
 Implement the ml-lab improvement plan (items 1-10) on branch plan/repo-improvement and open a PR
 
-Revision: 16 · Phase: review
-Next: Open the PR from plan/repo-improvement and get a human review
+Revision: 17 · Phase: review
+Next: Human review of PR #15
 
 ## Scope
 {"kinds": ["planning", "refactor", "testing"], "surfaces": ["cli"], "tags": [], "paths": ["ml_elements", "experiments", "docs", "tests", "Makefile", "pyproject.toml", ".gitignore"]}
@@ -45,9 +45,11 @@ Next: Open the PR from plan/repo-improvement and get a human review
 
 ## Actual changed paths (unattributed)
 
+PR: https://github.com/elacerdajr/ml-lab/pull/15
+
 ## Limits
 - Assessment validates records and current fingerprints, not product quality or authorization.
 - External review/results are declarations; they are not independently authenticated.
 - Changed paths are not automatically attributable to this task; unpublished edits are local.
 
-Snapshot: 2026-10-22T21:05:20+00:00
+Snapshot: 2026-10-22T21:06:22+00:00

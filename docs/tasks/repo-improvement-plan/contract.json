@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "id": "repo-improvement-plan",
-  "revision": 16,
+  "revision": 17,
   "outcome": "Implement the ml-lab improvement plan (items 1-10) on branch plan/repo-improvement and open a PR",
   "scope": {
     "kinds": [
@@ -24,7 +24,7 @@
     ]
   },
   "phase": "review",
-  "next_action": "Open the PR from plan/repo-improvement and get a human review",
+  "next_action": "Human review of PR #15",
   "boundaries": [],
   "unknowns": [],
   "decisions": [
@@ -36,7 +36,9 @@
     "CatBoost experiment records made on another machine are left as committed; original and new code agree exactly on this machine",
     "Reports stay in their current locations; moving them would break relative image links"
   ],
-  "delivery": {},
+  "delivery": {
+    "pr_url": "https://github.com/elacerdajr/ml-lab/pull/15"
+  },
   "obligations": [
     {
       "origin": "manual",
@@ -743,5 +745,5 @@
       "source": "operations/DEPLOYMENT.md"
     }
   ],
-  "_seal": "efed24999c3f41f2bf51f505979fcc5d2cdde9d17d27e2d7ce58a002cadae33b"
+  "_seal": "0142d73d539d774c4a8d330da7dac67274a995cfbac39812547a18cec29cc4d8"
 }
