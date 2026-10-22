@@ -56,9 +56,11 @@ class Run:
         ``"default"`` writes the tracked record into ``outputs/``; any other
         name writes into ``outputs_<profile>/``.
     seed : int | None
-        The run's base seed, recorded in ``run_meta.json``.
+        The run's base seed, recorded in ``run_meta.json``. Defaults to a
+        top-level ``seed`` in the folder's ``config.yaml``.
     config : dict
-        The resolved configuration, recorded in ``run_meta.json``.
+        The resolved configuration, recorded in ``run_meta.json``. Defaults to
+        every ``*.yaml`` file in the experiment folder, keyed by file name.
 
     Creating a ``Run`` creates its output folder. It raises ``ProfileMismatch``
     if that folder's ``run_meta.json`` names a different profile.
@@ -71,6 +73,16 @@ class Run:
 
     def __post_init__(self) -> None:
         self.experiment_dir = Path(self.experiment_dir).resolve()
+        if not self.config:
+            import yaml
+
+            self.config = {
+                p.name: yaml.safe_load(p.read_text())
+                for p in sorted(self.experiment_dir.glob("*.yaml"))
+            }
+            main_config = self.config.get("config.yaml") or {}
+            if self.seed is None and isinstance(main_config.get("seed"), int):
+                self.seed = main_config["seed"]
         self.output_dir.mkdir(parents=True, exist_ok=True)
         meta_path = self.output_dir / META_FILE
         if meta_path.exists():

@@ -43,6 +43,36 @@ from .protocols import ModelBackend
 _DEFAULT_RANDOM_STATE = 42
 
 
+class SeededFit:
+    """
+    Wraps an estimator whose ``fit`` draws from NumPy's global random state.
+
+    imodels' FIGS and GreedyRuleList do this, so without a seed two runs of the
+    same experiment give different models even with ``random_state`` set.
+    ``fit`` seeds the global state with ``seed`` and restores it afterwards.
+    Every other attribute (``predict_proba``, ``rules_``, ``complexity_``, …)
+    is the wrapped estimator's.
+    """
+
+    def __init__(self, estimator: Any, seed: int) -> None:
+        self.estimator = estimator
+        self.seed = seed
+
+    def fit(self, X, y, **kwargs) -> SeededFit:
+        state = np.random.get_state()
+        np.random.seed(self.seed)
+        try:
+            self.estimator.fit(X, y, **kwargs)
+        finally:
+            np.random.set_state(state)
+        return self
+
+    def __getattr__(self, name: str) -> Any:
+        if name in ("estimator", "seed"):  # not yet set, e.g. while unpickling
+            raise AttributeError(name)
+        return getattr(self.estimator, name)
+
+
 def make_logistic(
     random_state: int = _DEFAULT_RANDOM_STATE,
     max_iter: int = 300,
@@ -250,7 +280,8 @@ def make_figs(
         Upper bound on the total number of rules (leaves across all trees).
         Controls the capacity of the additive tree-sum model.
     random_state : int
-        Reproducibility seed.
+        Reproducibility seed, passed to FIGS and used to seed NumPy's global
+        random state during ``fit`` (see ``SeededFit``).
     **kwargs
         Forwarded to ``FIGSClassifier``.
 
@@ -271,10 +302,9 @@ def make_figs(
                 "make_figs requires imodels. Install with: pip install imodels"
             ) from exc
 
-        return FIGSClassifier(
-            max_rules=max_rules,
-            random_state=random_state,
-            **kwargs,
+        return SeededFit(
+            FIGSClassifier(max_rules=max_rules, random_state=random_state, **kwargs),
+            seed=random_state,
         )
 
     factory.__name__ = "make_figs"
@@ -283,6 +313,7 @@ def make_figs(
 
 def make_greedy_rule_list(
     max_depth: int = 8,
+    random_state: int = _DEFAULT_RANDOM_STATE,
     **kwargs: Any,
 ) -> Callable[[], ModelBackend]:
     """
@@ -297,6 +328,9 @@ def make_greedy_rule_list(
     ----------
     max_depth : int
         Maximum length of the rule list.
+    random_state : int
+        Seeds NumPy's global random state during ``fit`` (see ``SeededFit``);
+        GreedyRuleList has no seed parameter of its own.
     **kwargs
         Forwarded to ``GreedyRuleListClassifier``.
 
@@ -318,10 +352,7 @@ def make_greedy_rule_list(
                 "Install with: pip install imodels"
             ) from exc
 
-        return GreedyRuleListClassifier(
-            max_depth=max_depth,
-            **kwargs,
-        )
+        return SeededFit(GreedyRuleListClassifier(max_depth=max_depth, **kwargs), seed=random_state)
 
     factory.__name__ = "make_greedy_rule_list"
     return factory

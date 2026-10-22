@@ -31,3 +31,24 @@ def test_embed_leaves_returns_one_leaf_index_per_tree():
     one_hot = embed_leaves(model, X, one_hot=True)
     assert one_hot.shape[0] == 400
     np.testing.assert_array_equal(one_hot.sum(axis=1).A.ravel(), np.full(400, 12))
+
+
+def test_imodels_factories_fit_the_same_model_whatever_the_global_random_state():
+    pytest.importorskip("imodels")
+    from ml_elements import make_figs, make_greedy_rule_list
+
+    df = GaussianPopulation(0.2, {f"x{i}": 0.1 for i in range(30)}).sample(400, seed=1)
+    cols = [c for c in df.columns if c != "y"]
+    for factory in (make_figs(), make_greedy_rule_list()):
+        predictions = []
+        for global_seed in (1, 2):
+            np.random.seed(global_seed)
+            model = factory().fit(df[cols], df["y"])
+            predictions.append(model.predict_proba(df[cols])[:, 1])
+            # fit leaves the caller's global random state where it was
+            np.random.seed(global_seed)
+            expected = np.random.random()
+            np.random.seed(global_seed)
+            factory().fit(df[cols], df["y"])
+            assert np.random.random() == expected
+        np.testing.assert_array_equal(*predictions)

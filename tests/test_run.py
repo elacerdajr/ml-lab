@@ -54,3 +54,11 @@ def test_markdown_in_non_default_outputs_does_not_count(tmp_path):
     (tmp_path / "outputs_smoke").mkdir()
     (tmp_path / "outputs_smoke" / "report.md").write_text("![x](../outputs/fig.png)")
     assert report_figures(tmp_path) == []
+
+
+def test_a_run_without_config_records_the_folders_yaml_files(tmp_path):
+    (tmp_path / "config.yaml").write_text("seed: 7\nn_train: 100\n")
+    (tmp_path / "study.yaml").write_text("p_pos: [0.1, 0.2]\n")
+    run = Run(tmp_path)
+    assert run.seed == 7
+    assert run.config == {"config.yaml": {"seed": 7, "n_train": 100}, "study.yaml": {"p_pos": [0.1, 0.2]}}
