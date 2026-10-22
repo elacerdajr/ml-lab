@@ -13,7 +13,8 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 import scipy.sparse as sp
-from sklearn.preprocessing import OneHotEncoder
+
+from ml_elements.models import embed_leaves
 
 from .data import FEATURES
 from .models import to_catboost_X
@@ -31,9 +32,7 @@ def get_catboost_leaf_embedding(catboost_model, X: pd.DataFrame) -> sp.csr_matri
     ``calc_leaf_indexes`` returns an ``(n, n_trees)`` integer matrix; each tree
     column is one-hot encoded and the blocks are concatenated.
     """
-    leaves = catboost_model.calc_leaf_indexes(to_catboost_X(X))  # (n, n_trees)
-    ohe = OneHotEncoder(handle_unknown="ignore", sparse_output=True)
-    return ohe.fit_transform(leaves)
+    return embed_leaves(catboost_model, to_catboost_X(X), one_hot=True)
 
 
 def get_rff_embedding(rff_pipeline, X: pd.DataFrame) -> np.ndarray:

@@ -8,11 +8,11 @@ Reuses ``ml_elements`` metric objects for AP / AUC (calling ``.fn`` directly so
 ranking scores are not clipped) and computes log-loss / Brier only for scores
 tagged as probabilities.
 
+The score-smoothness measures (entropy, tie rate, max gap) come from
+``ml_elements.scores``.
+
 Functions
 ---------
-compute_score_entropy   50-bin Shannon entropy and its ``/log(50)`` normalisation.
-compute_tie_rate        tie rate + unique-score / occupied-bin counts.
-compute_score_gap_metrics  max gap between adjacent sorted scores.
 compute_classification_metrics  AP / AUC / log-loss / Brier (log-loss & Brier gated).
 eval_row                Assemble one metrics.csv row.
 compute_bucket_metrics  Per-bucket lift table for operational ranking.
@@ -24,39 +24,7 @@ import numpy as np
 import pandas as pd
 
 from ml_elements.metrics import AUC, AVG_PRECISION, BRIER, LOGLOSS
-
-N_ENTROPY_BINS = 50
-
-
-def compute_score_entropy(scores: np.ndarray, bins: int = N_ENTROPY_BINS) -> tuple[float, float]:
-    """Return ``(entropy, normalized_entropy)`` from a ``bins``-bin histogram over [0,1]."""
-    hist, _ = np.histogram(scores, bins=bins, range=(0.0, 1.0), density=False)
-    total = hist.sum()
-    if total == 0:
-        return 0.0, 0.0
-    p = hist / total
-    p = p[p > 0]
-    entropy = float(-(p * np.log(p)).sum())
-    return entropy, entropy / np.log(bins)
-
-
-def compute_tie_rate(scores: np.ndarray, bins: int = N_ENTROPY_BINS) -> dict:
-    """Tie rate, number of unique scores, and number of occupied histogram bins."""
-    n = len(scores)
-    n_unique = int(np.unique(scores).size)
-    hist, _ = np.histogram(scores, bins=bins, range=(0.0, 1.0))
-    return {
-        "tie_rate": float(1.0 - n_unique / n) if n else 0.0,
-        "n_unique_scores": n_unique,
-        "occupied_bins": int((hist > 0).sum()),
-    }
-
-
-def compute_score_gap_metrics(scores: np.ndarray) -> float:
-    """Maximum gap between adjacent values of the sorted score vector."""
-    if len(scores) < 2:
-        return 0.0
-    return float(np.max(np.diff(np.sort(scores))))
+from ml_elements.scores import max_score_gap, score_entropy, tie_rate
 
 
 def compute_classification_metrics(y: np.ndarray, score: np.ndarray, is_prob: bool) -> dict:
@@ -88,8 +56,8 @@ def eval_row(
     Build a full metrics row: identifying ``keys`` + classification metrics +
     score-smoothness metrics + ``timings`` + ``counts``.
     """
-    entropy, norm_entropy = compute_score_entropy(score)
-    ties = compute_tie_rate(score)
+    entropy, norm_entropy = score_entropy(score)
+    ties = tie_rate(score)
     row = dict(keys)
     row.update(compute_classification_metrics(y, score, is_prob))
     row["score_entropy"] = entropy
@@ -97,7 +65,7 @@ def eval_row(
     row["tie_rate"] = ties["tie_rate"]
     row["n_unique_scores"] = ties["n_unique_scores"]
     row["occupied_bins"] = ties["occupied_bins"]
-    row["max_score_gap"] = compute_score_gap_metrics(score)
+    row["max_score_gap"] = max_score_gap(score)
     row.update(timings)
     row.update(counts)
     return row

@@ -43,10 +43,10 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from sklearn.svm import SVC, LinearSVC
 
-from .calibration import predict_prob, wrap_sigmoid
+from ml_elements.scores import calibrate_sigmoid, positive_scores, to_weighted_rows
+
 from .config import Config
 from .data import CAT_FEATURES, FEATURES, NUM_FEATURES
-from .priors import to_weighted_rows
 
 CAT_IDX = [FEATURES.index(c) for c in CAT_FEATURES]  # [0, 1] for CatBoost
 
@@ -158,7 +158,7 @@ def build_registry(pre: ColumnTransformer, cfg: Config, train_under_n: int) -> d
     )
     reg["linear_svm"] = ModelSpec(
         name="linear_svm",
-        make_hard=lambda: wrap_sigmoid(
+        make_hard=lambda: calibrate_sigmoid(
             Pipeline([("pre", clone(pre)), ("clf", LinearSVC(max_iter=cfg.models["linear_svm"]["max_iter"], random_state=seed))])
         ),
         soft_mode=None,
@@ -230,7 +230,7 @@ def build_registry(pre: ColumnTransformer, cfg: Config, train_under_n: int) -> d
     if train_under_n <= rbf_cfg["max_train_n"]:
         reg["rbf_svm"] = ModelSpec(
             name="rbf_svm",
-            make_hard=lambda: wrap_sigmoid(
+            make_hard=lambda: calibrate_sigmoid(
                 Pipeline(
                     [
                         ("pre", clone(pre)),
@@ -292,5 +292,5 @@ def predict_scores(model, X: pd.DataFrame, is_catboost: bool) -> tuple[np.ndarra
     """Positive-class probability + prediction time (seconds)."""
     t0 = time.perf_counter()
     Xin = to_catboost_X(X) if is_catboost else X
-    p = predict_prob(model, Xin)
+    p = positive_scores(model, Xin)
     return np.asarray(p, dtype=float), time.perf_counter() - t0

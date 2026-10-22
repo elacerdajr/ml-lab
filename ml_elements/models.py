@@ -4,9 +4,9 @@ models.py
 Model factory functions.
 
 Each factory returns a sklearn-compatible object that satisfies the
-``ModelBackend`` protocol (fit / predict_proba). Pass a factory — not an
-instance — wherever ``TrialRunner`` or ``Trial.model_factory`` expects one,
-so a fresh model is created for every trial.
+``ModelBackend`` protocol (fit / predict_proba). Pass a factory, not an
+instance, wherever ``Setup.model``, ``evaluate(model=...)`` or
+``Trial.model_factory`` expects one, so a fresh model is created for every trial.
 
 Functions
 ---------
@@ -14,10 +14,11 @@ make_logistic   Fast linear baseline. Matches the Gaussian log-odds structure.
 make_hgb        Lightweight sklearn histogram gradient booster.
 make_catboost   CatBoost gradient booster (requires ``pip install catboost``).
 make_sklearn    Generic wrapper — pass any sklearn estimator class + kwargs.
+embed_leaves    Per-tree leaf indices of a fitted CatBoost model, as features.
 
 Examples
 --------
->>> runner = TrialRunner(setups=..., model_factory=make_logistic(), ...)
+>>> result = evaluate(trials, setups, metrics, budget, model=make_logistic())
 
 >>> # Per-trial override — catboost on one trial, logistic on all others:
 >>> trial = Trial(..., model_factory=make_catboost(depth=6))
@@ -32,6 +33,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
+import numpy as np
 from sklearn.ensemble import HistGradientBoostingClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.tree import DecisionTreeClassifier
@@ -101,22 +103,32 @@ def make_hgb(
     random_state : int
         Reproducibility seed.
     **kwargs
-        Forwarded to ``HistGradientBoostingClassifier``.
+        Forwarded to ``HistGradientBoostingClassifier``. Early stopping is off
+        unless you pass ``early_stopping=True``; then ``scoring`` sets its
+        criterion (a string, or ``metric.as_scorer()``) and
+        ``validation_fraction`` defaults to 0.1.
 
     Returns
     -------
     Callable[[], ModelBackend]
         Zero-argument factory.
+
+    Examples
+    --------
+    >>> make_hgb(early_stopping=True, scoring="average_precision")
+    >>> make_hgb(early_stopping=True, scoring=(AVG_PRECISION - 0.001 * N_ITER).as_scorer())
     """
+    params = {"validation_fraction": None, "early_stopping": False, **kwargs}
+    if params["early_stopping"] and params["validation_fraction"] is None:
+        params["validation_fraction"] = 0.1
+
     def factory() -> ModelBackend:
         return HistGradientBoostingClassifier(
             max_iter=iterations,
             learning_rate=learning_rate,
             max_leaf_nodes=max_leaf_nodes,
             random_state=random_state,
-            validation_fraction=None,
-            early_stopping=False,
-            **kwargs,
+            **params,
         )
 
     factory.__name__ = "make_hgb"
@@ -403,3 +415,27 @@ def make_sklearn(
 
     factory.__name__ = f"make_sklearn({cls.__name__})"
     return factory
+
+
+def embed_leaves(model: Any, X: Any, *, dtype=np.float32, one_hot: bool = False):
+    """
+    Per-tree leaf indices of a fitted CatBoost model, as a feature matrix.
+
+    Parameters
+    ----------
+    model : fitted CatBoost model
+        Anything with ``calc_leaf_indexes(X)``.
+    X : array, DataFrame or catboost.Pool
+    dtype : numpy dtype
+        Type of the ``(n, n_trees)`` index matrix.
+    one_hot : bool
+        Return a sparse one-hot encoding of each tree's leaf instead (one block
+        of columns per tree), e.g. for UMAP with ``metric="cosine"``. The
+        encoding is fitted on ``X`` itself.
+    """
+    leaves = model.calc_leaf_indexes(X)
+    if not one_hot:
+        return np.asarray(leaves).astype(dtype)
+    from sklearn.preprocessing import OneHotEncoder
+
+    return OneHotEncoder(handle_unknown="ignore", sparse_output=True).fit_transform(leaves)

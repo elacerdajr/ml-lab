@@ -13,8 +13,9 @@ from __future__ import annotations
 
 import numpy as np
 
+from ml_elements.scores import noise_rank, shrink
+
 from .config import Config
-from .priors import noise_rank, posthoc_shrinkage
 
 
 def apply_transforms(
@@ -37,7 +38,7 @@ def apply_transforms(
     out: dict[str, tuple[np.ndarray, bool]] = {"raw": (p, True)}
 
     for lam in cfg.priors.shrinkage_lambdas:
-        out[f"shrink@{lam:g}"] = (posthoc_shrinkage(p, pi, lam), True)
+        out[f"shrink@{lam:g}"] = (shrink(p, pi, lam), True)
 
     for alpha in cfg.priors.noise_alphas:
         out[f"noise@{alpha:g}"] = (noise_rank(p, row_ids, alpha, seed), False)

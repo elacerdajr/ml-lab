@@ -9,9 +9,9 @@ DataBudget
     ``budget_override``.
 
 Trial
-    One experimental condition: a (name, value) label, a DGP, and
+    One experimental condition: a (name, value) label, a population, and
     optional per-trial overrides for model factory and data budget.
-    A list of trials is the only input ``Study.run()`` needs.
+    ``sweep()`` builds lists of them; ``evaluate()`` runs them.
 """
 
 from __future__ import annotations
@@ -19,7 +19,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
-from .protocols import DGP, ModelBackend
+from .protocols import ModelBackend, Population
 
 _UNSET = object()
 
@@ -98,12 +98,12 @@ class DataBudget:
         )
 
 
-@dataclass
+@dataclass(init=False)
 class Trial:
     """
     One experimental condition.
 
-    A trial defines *what* to vary: the data-generating process, the
+    A trial defines *what* to vary: the population sampled from, the
     condition label, and optional per-trial overrides for the model
     factory and data budget.
 
@@ -114,30 +114,32 @@ class Trial:
         Used as a column label in result DataFrames.
     value : float
         The specific value for this trial, e.g. ``0.05`` or ``1.25``.
-    dgp : DGP
-        Data-generating process for this trial.
+    population : Population
+        What this trial samples labelled rows from.
     seed_offset : int
         Added to all budget seeds to ensure non-overlapping data across
         trials. Each trial should have a unique offset.
     model_factory : Callable[[], ModelBackend] | None
-        If set, overrides the ``TrialRunner``'s default model factory for
-        this trial only. Useful for per-trial hyperparameter variation.
+        If set, overrides ``evaluate``'s default model for setups that name
+        none. Useful for per-trial hyperparameter variation.
     budget_override : DataBudget | None
-        If set, overrides the ``TrialRunner``'s default ``DataBudget`` for
-        this trial only. Useful for train-size sweep studies.
+        If set, overrides ``evaluate``'s ``DataBudget`` for this trial only.
+        Useful for train-size sweep studies.
+    params : dict
+        The swept parameter values that produced this trial (set by ``sweep``).
 
     Examples
     --------
     Standard trial — uses runner defaults:
 
-    >>> trial = Trial(name="p_pos", value=0.05, dgp=my_dgp, seed_offset=10_001)
+    >>> trial = Trial(name="p_pos", value=0.05, population=my_population, seed_offset=10_001)
 
     Override model for this one trial:
 
     >>> trial = Trial(
     ...     name="lr_search",
     ...     value=0.01,
-    ...     dgp=my_dgp,
+    ...     population=my_population,
     ...     seed_offset=20_001,
     ...     model_factory=make_catboost(learning_rate=0.01),
     ... )
@@ -145,7 +147,37 @@ class Trial:
 
     name: str
     value: float
-    dgp: DGP
+    population: Population
     seed_offset: int
     model_factory: Callable[[], ModelBackend] | None = field(default=None)
     budget_override: DataBudget | None = field(default=None)
+    params: dict[str, float] = field(default_factory=dict)
+
+    def __init__(
+        self,
+        name: str,
+        value: float,
+        population: Population | None = None,
+        seed_offset: int | None = None,
+        model_factory: Callable[[], ModelBackend] | None = None,
+        budget_override: DataBudget | None = None,
+        params: dict[str, float] | None = None,
+        *,
+        dgp: Population | None = None,
+    ) -> None:
+        if (population is None) == (dgp is None):
+            raise TypeError("Trial needs exactly one of population= or its former name dgp=.")
+        if seed_offset is None:
+            raise TypeError("Trial needs seed_offset (unique per trial, so data does not overlap).")
+        self.name = name
+        self.value = value
+        self.population = population if population is not None else dgp
+        self.seed_offset = seed_offset
+        self.model_factory = model_factory
+        self.budget_override = budget_override
+        self.params = dict(params or {})
+
+    @property
+    def dgp(self) -> Population:
+        """Former name of ``population``."""
+        return self.population
