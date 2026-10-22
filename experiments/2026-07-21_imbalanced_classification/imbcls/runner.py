@@ -262,9 +262,12 @@ def run(cfg: Config, out_dir: Path, log=None) -> Results:
     buckets_df = pd.concat(bucket_rows, ignore_index=True)
 
     # 5. Save tables ---------------------------------------------------------
-    metrics_df.to_csv(out_dir / "metrics.csv", index=False)
+    # Timings change on every run, so they live apart from the reproducible scores.
+    timing_cols = ["train_time_seconds", "predict_time_seconds"]
+    metrics_df.drop(columns=timing_cols).to_csv(out_dir / "metrics.csv", index=False)
+    metrics_df[["run_id", *timing_cols]].to_csv(out_dir / "timings.csv", index=False)
     buckets_df.to_csv(out_dir / "bucket_metrics.csv", index=False)
-    log.saved(f"metrics.csv ({len(metrics_df)} rows), bucket_metrics.csv ({len(buckets_df)} rows)")
+    log.saved(f"metrics.csv ({len(metrics_df)} rows), timings.csv, bucket_metrics.csv ({len(buckets_df)} rows)")
 
     # 6. Plots ---------------------------------------------------------------
     log.section("Plots")
@@ -385,6 +388,8 @@ def _save_artifacts(cfg, pre_emb, kept, art_dir, log):
     except Exception:
         log.warn("joblib not installed — skipping artifact dumps")
         return
+    (art_dir / "fitted_preprocessors").mkdir(parents=True, exist_ok=True)
+    (art_dir / "fitted_models").mkdir(parents=True, exist_ok=True)
     if cfg.output.save_preprocessors:
         joblib.dump(pre_emb, art_dir / "fitted_preprocessors" / "preprocessor.joblib")
     if cfg.output.save_linear_models:

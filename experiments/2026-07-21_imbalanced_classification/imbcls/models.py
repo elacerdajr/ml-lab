@@ -159,7 +159,7 @@ def build_registry(pre: ColumnTransformer, cfg: Config, train_under_n: int) -> d
     reg["linear_svm"] = ModelSpec(
         name="linear_svm",
         make_hard=lambda: wrap_sigmoid(
-            Pipeline([("pre", clone(pre)), ("clf", LinearSVC(max_iter=cfg.models["linear_svm"]["max_iter"]))])
+            Pipeline([("pre", clone(pre)), ("clf", LinearSVC(max_iter=cfg.models["linear_svm"]["max_iter"], random_state=seed))])
         ),
         soft_mode=None,
     )

@@ -38,3 +38,6 @@ exp-imbalanced-classification-smoke:  ## Fast smoke run of the imbalanced-classi
 
 exp-leaf-embedding-umap:  ## Leaf-index UMAP (Hamming) reduction vs native CatBoost: logit/SVM/RF/MLP/CatBoost across k, incl. training time
 	cd experiments/2026-07-22_leaf_embedding_umap && uv run --extra catboost --extra umap --extra viz python run_experiment.py
+
+track-figures:  ## Force-add every output figure a report embeds or names (other figures are gitignored)
+	$(PYTHON) -c "from pathlib import Path; from ml_elements.run import report_figures; print('\n'.join(str(p) for d in sorted(Path('experiments').iterdir()) if d.is_dir() for p in report_figures(d)))" | xargs git add -f

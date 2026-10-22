@@ -34,6 +34,26 @@ The YAML files separate *what to run* from *how to run it*. The Python files are
 
 ---
 
+## Outputs and the record
+
+An experiment's **record** is what git keeps: the answer and enough to check it.
+
+| Tracked | Not tracked |
+|---|---|
+| `report.md`, `README.md` and other Markdown | Model dumps (`outputs/artifacts/`, `*.joblib`, `*.cbm`) |
+| Figures a Markdown file embeds, names, or matches with a backticked glob such as `` `fig_heatmap_*.png` `` | Any other figure in `outputs/` |
+| CSV and JSON summaries in `outputs/` | Runs under a non-default profile: `outputs_<profile>/` |
+| `outputs/run_meta.json` (profile, seed, config, git revision, package versions) | |
+
+Rules that keep the record honest:
+
+- **Only the default profile writes the record.** Build a `Run(experiment_dir, profile=..., seed=..., config=...)` from `ml_elements.run` and write into `run.output_dir`. A smoke or other non-default run goes to `outputs_<profile>/` with its own report, so it can never overwrite `outputs/` or the top-level `report.md`. Creating a `Run` fails if its folder already holds results from a different profile.
+- **Call `record(run)` at the end** to write `run_meta.json`. It has no timestamp, so the same code and seed produce the same file.
+- **Rerunning with the same seed must leave tracked files unchanged**, except content derived from wall-clock timing. Keep timings in their own file (for example `timings.csv`) rather than in a score table.
+- **A new figure used by a report** is ignored until you add it: run `make track-figures`, which force-adds every figure that `ml_elements.run.report_figures` finds for each experiment.
+
+---
+
 ## Running the existing experiment
 
 ```bash
