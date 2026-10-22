@@ -1,0 +1,24 @@
+# 2026-07-22_leaf_embedding_umap: settings read by run_experiment.py
+
+p_pos: 0.05
+
+n_train: 4000
+
+n_test: 4000
+
+seed: 42
+
+k_values: [2, 5, 10, 20]
+
+numeric_info: {num_x1: 1.2, num_x2: 0.6, num_x3: 0.2}
+
+categorical_info: {cat_x1: 1.0, cat_x2: 0.5, cat_x3: 0.1}
+
+# Fixed z-score cut points per categorical column -> deterministic bin
+# labels regardless of which sample (train/test) they're applied to.
+bin_edges:
+  cat_x1: [-1.0, 0.0, 1.0]           # 4 categories
+  cat_x2: [-0.5, 0.5]                # 3 categories
+  cat_x3: [-1.0, -0.33, 0.33, 1.0]   # 5 categories
+
+extractor_cfg: {iterations: 300, depth: 6, learning_rate: 0.05}

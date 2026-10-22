@@ -25,11 +25,15 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import yaml
 from sklearn.metrics import average_precision_score, pairwise_distances
 
-from ml_elements.dgp import GaussianBinaryDGP
+from ml_elements.models import embed_leaves
+from ml_elements.population import GaussianPopulation
+from ml_elements.run import Run, record
 
 SCRIPT_DIR = Path(__file__).parent
+CONFIG = yaml.safe_load((SCRIPT_DIR / "config.yaml").read_text())
 OUT_DIR = SCRIPT_DIR / "outputs"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -45,23 +49,16 @@ log = logging.getLogger(__name__)
 # Configuration
 # ---------------------------------------------------------------------------
 
-SIGMAS = [0.05, 0.10, 0.25, 0.50]
+SIGMAS = CONFIG["sigmas"]
 
-EXTRACTOR_CONFIGS: dict[str, dict] = {
-    "heavy_reg": dict(depth=3, iterations=100, l2_leaf_reg=100, random_strength=10),
-    "light_reg": dict(depth=4, iterations=200, l2_leaf_reg=1, random_strength=1),
-}
+EXTRACTOR_CONFIGS: dict[str, dict] = CONFIG["extractor_configs"]
 
-P_POS = 0.10
-N_TRAIN = 2_000
-N_TEST = 2_000
-SEED = 42
+P_POS = CONFIG["p_pos"]
+N_TRAIN = CONFIG["n_train"]
+N_TEST = CONFIG["n_test"]
+SEED = CONFIG["seed"]
 
-DGP = GaussianBinaryDGP(
-    p_pos=P_POS,
-    info={"x1": 1.2, "x2": 0.8, "x3": 0.4, "x4": 0.15, "x5": 0.05},
-    sigma=1.0,
-)
+population = GaussianPopulation(p_pos=P_POS, **CONFIG["population"])
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -90,11 +87,6 @@ def _fit_extractor(X: np.ndarray, y: np.ndarray, cfg: dict, seed: int) -> object
     )
     model.fit(X, y)
     return model
-
-
-def _leaf_embeddings(model: object, X: np.ndarray) -> np.ndarray:
-    emb = model.calc_leaf_indexes(X)          # (n, n_trees)  int32
-    return emb.astype(np.float32)
 
 
 def _hamming_distance(emb: np.ndarray) -> np.ndarray:
@@ -278,7 +270,7 @@ def _write_report(rows: list[dict]) -> None:
         "",
         "| Parameter | Value |",
         "|-----------|-------|",
-        "| DGP | GaussianBinaryDGP |",
+        "| population | GaussianPopulation |",
         f"| p_pos | {P_POS} |",
         "| Features | x1 (info=1.2), x2 (0.8), x3 (0.4), x4 (0.15), x5 (0.05) |",
         f"| n_train / n_test | {N_TRAIN:,} / {N_TEST:,} |",
@@ -453,8 +445,8 @@ def main() -> None:
         sys.exit(1)
 
     log.info("Generating data — n_train=%d  n_test=%d  p_pos=%.2f", N_TRAIN, N_TEST, P_POS)
-    df_train = DGP.sample(n=N_TRAIN, seed=SEED)
-    df_test = DGP.sample(n=N_TEST, seed=SEED + 1_000)
+    df_train = population.sample(n=N_TRAIN, seed=SEED)
+    df_test = population.sample(n=N_TEST, seed=SEED + 1_000)
 
     y_train = df_train["y"].values
     X_train = df_train.drop(columns="y").values
@@ -471,7 +463,7 @@ def main() -> None:
         extractor = _fit_extractor(X_train, y_train, extractor_cfg, SEED)
 
         log.info("  extracting leaf embeddings …")
-        emb_train = _leaf_embeddings(extractor, X_train)
+        emb_train = embed_leaves(extractor, X_train)
         log.info("  embedding shape: %s", emb_train.shape)
 
         log.info("  computing Hamming distance matrix (%d×%d) …", N_TRAIN, N_TRAIN)
@@ -532,3 +524,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+    record(Run(SCRIPT_DIR))  # run_meta.json: config, seed, git revision, packages

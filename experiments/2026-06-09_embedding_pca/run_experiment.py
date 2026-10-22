@@ -18,7 +18,6 @@ from collections.abc import Iterable
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-REPO_ROOT = HERE.parents[1]
 
 INSTALL_HINT = "pip install numpy pandas scikit-learn matplotlib pyyaml sentence-transformers"
 REQUIRED_PACKAGES = ["numpy", "pandas", "sklearn", "matplotlib", "yaml", "sentence_transformers"]
@@ -527,3 +526,6 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+    from ml_elements.run import Run, record
+
+    record(Run(HERE))  # run_meta.json: config, seed, git revision, packages

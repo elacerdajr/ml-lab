@@ -20,10 +20,10 @@ experiment:
     noise (info=0.0). Goal: identify which hyperparameters amplify or
     suppress the effect of the random noise features.
 
-# ── DGP ───────────────────────────────────────────────────────────────────
+# ── Population ───────────────────────────────────────────────────────────────────
 # Informative features: x00–x19, separation 0.10 (weak but non-zero).
 # Noise features:       x20–x39, separation 0.00 (pure random noise).
-dgp:
+population:
   p_pos: 0.01
   sigma: 1.0
   n_informative: 20

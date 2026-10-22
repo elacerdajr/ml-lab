@@ -42,6 +42,7 @@ from typing import Any
 import matplotlib
 import numpy as np
 import pandas as pd
+import yaml
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -60,6 +61,7 @@ except ImportError as exc:
     raise ImportError("pip install catboost") from exc
 
 SCRIPT_DIR = Path(__file__).resolve().parent
+CONFIG = yaml.safe_load((SCRIPT_DIR / "config.yaml").read_text())
 OUT_DIR = SCRIPT_DIR / "outputs"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -72,11 +74,11 @@ log = logging.getLogger(__name__)
 
 # ─── Constants ──────────────────────────────────────────────────────────────
 
-N_TRAIN = 300
-N_TEST = 20_000
-D_NOISE = 100
-SEED = 42
-N_BOOTSTRAP = 100
+N_TRAIN = CONFIG["n_train"]
+N_TEST = CONFIG["n_test"]
+D_NOISE = CONFIG["d_noise"]
+SEED = CONFIG["seed"]
+N_BOOTSTRAP = CONFIG["n_bootstrap"]
 
 _MODEL_COLORS = {
     "logistic": "#2563eb",
@@ -657,7 +659,7 @@ The worst-regime AUC is the key robustness metric under distributional uncertain
 ## The Core Distinction
 
 **Risk** (Knight, 1921): outcomes follow a *known stable* probability law.
-Past data is sufficient to estimate the DGP and deploy confidently.
+Past data is sufficient to estimate the population and deploy confidently.
 
 **Uncertainty**: outcomes follow a law that is *unknown or changing*.
 Past patterns may not transfer — because the regime shifted, training was too
@@ -691,7 +693,7 @@ small to identify the true rule, or a shortcut feature stops working out-of-samp
 
 ### Scenario 1 — Pure Risk
 
-**DGP**: same rule `p = sigmoid(0.4·x₀ − 0.3·x₁)` in both train and test.
+**Population**: same rule `p = sigmoid(0.4·x₀ − 0.3·x₁)` in both train and test.
 This is the "known dice" world: historical data is representative of the future.
 
 Under pure risk, complex models are allowed to win if they find the signal.
@@ -699,7 +701,7 @@ Generalization gaps should be small (both train and test see the same law).
 
 ### Scenario 2 — Epistemic Uncertainty
 
-**DGP**: same rule, but n_train=150 with 100 noise features (150 samples to
+**Population**: same rule, but n_train=150 with 100 noise features (150 samples to
 identify 1 signal among 102 candidates). Past data exists, but it's too thin
 to distinguish the true rule from many competing hypotheses.
 
@@ -844,3 +846,6 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+    from ml_elements.run import Run, record
+
+    record(Run(SCRIPT_DIR))  # run_meta.json: config, seed, git revision, packages

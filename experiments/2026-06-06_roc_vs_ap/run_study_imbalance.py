@@ -17,19 +17,9 @@ from __future__ import annotations
 import argparse
 import json
 import logging
-import sys
-import types
 from pathlib import Path
 
-# ── paths ─────────────────────────────────────────────────────────────────────
-SCRIPT_DIR = Path(__file__).resolve().parent
-
-# ── stub missing optional dep (must precede run_experiment import) ─────────────
-_stub = types.ModuleType("bayesian_ap_comparator")
-_stub.BayesianAPComparator = object
-sys.modules.setdefault("bayesian_ap_comparator", _stub)
-
-from run_experiment import (  # noqa: E402
+from run_experiment import (
     build_conditions,
     build_model_factory,
     build_summary,
@@ -38,6 +28,9 @@ from run_experiment import (  # noqa: E402
     plot_score_space,
     run_study,
 )
+
+# ── paths ─────────────────────────────────────────────────────────────────────
+SCRIPT_DIR = Path(__file__).resolve().parent
 
 logging.basicConfig(
     level=logging.INFO,
@@ -70,7 +63,7 @@ def main() -> None:
     model_cfgs      = cfg["models"]
     model_factories = {name: build_model_factory(mc) for name, mc in model_cfgs.items()}
     metric_names    = cfg["metrics"]
-    sigma           = cfg["dgp"].get("sigma", 1.0)
+    sigma           = cfg["population"].get("sigma", 1.0)
 
     conditions = build_conditions(cfg, s_cfg)
     log.info("=== Study 1: %s (%d conditions) ===", s["label"], len(conditions))
@@ -108,7 +101,7 @@ def main() -> None:
     log.info("Saved %s", json_path.name)
 
     # ── plots ─────────────────────────────────────────────────────────────────
-    info_str = ", ".join(f"{k}={v}" for k, v in cfg["dgp"]["info"].items())
+    info_str = ", ".join(f"{k}={v}" for k, v in cfg["population"]["info"].items())
 
     plot_metrics_vs_condition(
         df=df, condition_col=s["condition_col"],

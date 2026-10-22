@@ -40,19 +40,20 @@ import numpy as np
 import pandas as pd
 import yaml
 
-warnings.filterwarnings("ignore")
-
-SCRIPT_DIR = Path(__file__).resolve().parent
-REPO_ROOT = SCRIPT_DIR.parents[1]
-
-from ml_elements import (  # noqa: E402
+from ml_elements import (
     AUC,
     AVG_PRECISION,
     BRIER,
     LOGLOSS,
-    GaussianBinaryDGP,
+    GaussianPopulation,
     make_catboost,
 )
+from ml_elements.run import Run, record
+
+warnings.filterwarnings("ignore")
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+
 
 OUT_DIR = SCRIPT_DIR / "outputs"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -79,23 +80,23 @@ def load_config() -> dict:
     return yaml.safe_load((SCRIPT_DIR / "config.yaml").read_text())
 
 
-def build_dgp(cfg: dict) -> tuple[GaussianBinaryDGP, list[str]]:
-    dgp_cfg = cfg["dgp"]
-    n_inf = dgp_cfg["n_informative"]
-    n_noise = dgp_cfg["n_noise"]
+def build_population(cfg: dict) -> tuple[GaussianPopulation, list[str]]:
+    population_cfg = cfg["population"]
+    n_inf = population_cfg["n_informative"]
+    n_noise = population_cfg["n_noise"]
 
     info: dict[str, float] = {}
     for i in range(n_inf):
-        info[f"x{i:02d}"] = float(dgp_cfg["info_informative"])
+        info[f"x{i:02d}"] = float(population_cfg["info_informative"])
     for i in range(n_inf, n_inf + n_noise):
-        info[f"x{i:02d}"] = float(dgp_cfg["info_noise"])
+        info[f"x{i:02d}"] = float(population_cfg["info_noise"])
 
-    dgp = GaussianBinaryDGP(
-        p_pos=dgp_cfg["p_pos"],
+    population = GaussianPopulation(
+        p_pos=population_cfg["p_pos"],
         info=info,
-        sigma=dgp_cfg["sigma"],
+        sigma=population_cfg["sigma"],
     )
-    return dgp, list(info.keys())
+    return population, list(info.keys())
 
 
 def build_metrics(cfg: dict):
@@ -106,7 +107,7 @@ def build_metrics(cfg: dict):
 
 
 def sample_fixed_splits(
-    dgp: GaussianBinaryDGP,
+    population: GaussianPopulation,
     cfg: dict,
     feature_cols: list[str],
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
@@ -119,7 +120,7 @@ def sample_fixed_splits(
 
     results = []
     for name, n, seed in splits:
-        df = dgp.sample(n, seed)
+        df = population.sample(n, seed)
         X = df[feature_cols].to_numpy()
         y = df["y"].to_numpy()
         n_pos = int(y.sum())
@@ -287,7 +288,7 @@ def plot_heatmaps(scores: pd.DataFrame, cfg: dict, metrics: list) -> None:
         fig, axes = plt.subplots(1, 2, figsize=(14, 5.5))
         fig.suptitle(
             f"CatBoost — {m.name}  "
-            f"(p_pos={cfg['dgp']['p_pos']}  "
+            f"(p_pos={cfg['population']['p_pos']}  "
             f"iter={cfg['sweep']['iterations']}  "
             f"lr={cfg['sweep']['learning_rate']})",
             fontsize=12,
@@ -397,7 +398,7 @@ def plot_depth_lines(scores: pd.DataFrame, cfg: dict, metrics: list) -> None:
         fig, axes = plt.subplots(1, 2, figsize=(14, 5.5), sharey=True)
         fig.suptitle(
             f"{m.name} vs l2_leaf_reg — one line per depth  "
-            f"(p_pos={cfg['dgp']['p_pos']})",
+            f"(p_pos={cfg['population']['p_pos']})",
             fontsize=12,
         )
         cmap = plt.get_cmap("plasma")
@@ -438,7 +439,7 @@ def plot_noise_vs_signal_importance(cfg: dict) -> None:
         return
 
     imp_df = pd.read_csv(imp_path)
-    n_inf = cfg["dgp"]["n_informative"]
+    n_inf = cfg["population"]["n_informative"]
     informative_names = {f"x{i:02d}" for i in range(n_inf)}
     imp_df["feature_type"] = imp_df["feature"].apply(
         lambda f: "informative" if f in informative_names else "noise"
@@ -502,22 +503,22 @@ def write_report(
     metrics: list,
 ) -> None:
     sw = cfg["sweep"]
-    dgp_cfg = cfg["dgp"]
+    population_cfg = cfg["population"]
 
     lines: list[str] = []
     lines.append("# Positives Weak Features — Report\n")
     lines.append(
-        f"**Research question**: at {dgp_cfg['p_pos']*100:.0f}% positives, "
+        f"**Research question**: at {population_cfg['p_pos']*100:.0f}% positives, "
         f"which CatBoost hyperparameters amplify or suppress the effect "
-        f"of {dgp_cfg['n_noise']} random noise features on model AP?\n"
+        f"of {population_cfg['n_noise']} random noise features on model AP?\n"
     )
     lines.append("## Setup\n")
     lines.append(
         f"| Parameter | Value |\n"
         f"|---|---|\n"
-        f"| p_pos | {dgp_cfg['p_pos']} |\n"
-        f"| Informative features | {dgp_cfg['n_informative']} (info={dgp_cfg['info_informative']}) |\n"
-        f"| Noise features | {dgp_cfg['n_noise']} (info={dgp_cfg['info_noise']}) |\n"
+        f"| p_pos | {population_cfg['p_pos']} |\n"
+        f"| Informative features | {population_cfg['n_informative']} (info={population_cfg['info_informative']}) |\n"
+        f"| Noise features | {population_cfg['n_noise']} (info={population_cfg['info_noise']}) |\n"
         f"| n_train | {cfg['data']['n_train']} |\n"
         f"| n_eval | {cfg['data']['n_eval']} |\n"
         f"| n_test | {cfg['data']['n_test']} |\n"
@@ -592,15 +593,15 @@ def write_report(
 
 def run() -> None:
     cfg = load_config()
-    dgp, feature_cols = build_dgp(cfg)
+    population, feature_cols = build_population(cfg)
     metrics = build_metrics(cfg)
 
     log.info(
-        "DGP: %d informative (info=%.2f) + %d noise features, p_pos=%.3f",
-        cfg["dgp"]["n_informative"],
-        cfg["dgp"]["info_informative"],
-        cfg["dgp"]["n_noise"],
-        cfg["dgp"]["p_pos"],
+        "population: %d informative (info=%.2f) + %d noise features, p_pos=%.3f",
+        cfg["population"]["n_informative"],
+        cfg["population"]["info_informative"],
+        cfg["population"]["n_noise"],
+        cfg["population"]["p_pos"],
     )
     log.info(
         "Sweep: CatBoost depth=%s × l2_leaf_reg=%s  (iterations=%d, lr=%g)",
@@ -616,7 +617,7 @@ def run() -> None:
 
     # 1. Sample fixed splits once
     X_train, y_train, X_eval, y_eval, X_test, y_test = sample_fixed_splits(
-        dgp, cfg, feature_cols
+        population, cfg, feature_cols
     )
 
     # 2. Run the 2D hyperparameter grid
@@ -654,3 +655,4 @@ def run() -> None:
 
 if __name__ == "__main__":
     run()
+    record(Run(SCRIPT_DIR))  # run_meta.json: config, seed, git revision, packages

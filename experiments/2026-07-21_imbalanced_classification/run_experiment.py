@@ -16,12 +16,7 @@ Usage
 
 from __future__ import annotations
 
-from pathlib import Path
-
-SCRIPT_DIR = Path(__file__).resolve().parent
-REPO_ROOT = SCRIPT_DIR.parents[1]
-
-from imbcls.main import main  # noqa: E402
+from imbcls.main import main
 
 if __name__ == "__main__":
     main()

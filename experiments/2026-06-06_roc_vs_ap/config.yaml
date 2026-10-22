@@ -18,7 +18,7 @@ data:
     train: 101
     test_base: 10000
 
-dgp:
+population:
   sigma: 1.0
   # Base feature info (class separation / sigma).
   # Studies may scale these via `info_scale`.

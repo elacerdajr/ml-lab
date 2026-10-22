@@ -8,7 +8,7 @@ information levels are drawn from Beta(1,9) (mean 0.10, strongly
 right‑skewed) — how does training sample size drive the gap between
 a high‑capacity booster (CatBoost) and interpretable rule/tree models
 (FIGS, GreedyRuleList, plain DecisionTree)? Logistic regression serves
-as the near‑Bayes reference (the DGP is linear in the features).
+as the near‑Bayes reference (the population is linear in the features).
 
 This replicates ``weak_features_sample_size`` but replaces the
 constant ``info_j = 0.10`` with ``info_j ~ Beta(1, 9)``, keeping the
@@ -39,19 +39,20 @@ import numpy as np
 import pandas as pd
 import yaml
 
-warnings.filterwarnings("ignore")
-
-SCRIPT_DIR = Path(__file__).resolve().parent
-REPO_ROOT = SCRIPT_DIR.parents[1]
-
-import ml_elements as mle  # noqa: E402
-from ml_elements import (  # noqa: E402
+import ml_elements as mle
+from ml_elements import (
     AUC,
     AVG_PRECISION,
     BRIER,
-    GaussianBinaryDGP,
+    GaussianPopulation,
     RichLogger,
 )
+from ml_elements.run import Run, record
+
+warnings.filterwarnings("ignore")
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+
 
 OUT_DIR = SCRIPT_DIR / "outputs"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -69,18 +70,18 @@ def load_config() -> dict:
     return yaml.safe_load(cfg_path.read_text())
 
 
-def build_dgp(cfg: dict) -> tuple[GaussianBinaryDGP, list[str], dict[str, float]]:
-    n_feat = cfg["dgp"]["n_features"]
+def build_population(cfg: dict) -> tuple[GaussianPopulation, list[str], dict[str, float]]:
+    n_feat = cfg["population"]["n_features"]
     features = [f"x{i:02d}" for i in range(n_feat)]
-    dist = cfg["dgp"]["info_dist"]
+    dist = cfg["population"]["info_dist"]
     rng = np.random.default_rng(dist["seed"])
     info = {f: float(rng.beta(dist["a"], dist["b"])) for f in features}
-    dgp = GaussianBinaryDGP(
-        p_pos=cfg["dgp"]["p_pos"],
+    population = GaussianPopulation(
+        p_pos=cfg["population"]["p_pos"],
         info=info,
-        sigma=cfg["dgp"]["sigma"],
+        sigma=cfg["population"]["sigma"],
     )
-    return dgp, features, info
+    return population, features, info
 
 
 def build_factories(cfg: dict) -> dict:
@@ -141,7 +142,7 @@ def extract_capacity(model) -> float | None:
 
 def run() -> None:
     cfg = load_config()
-    dgp, features, info_dict = build_dgp(cfg)
+    population, features, info_dict = build_population(cfg)
     factories = build_factories(cfg)
     metrics = build_metrics(cfg)
 
@@ -157,8 +158,8 @@ def run() -> None:
     info_df.to_csv(OUT_DIR / "feature_info.csv", index=False)
     log.info(
         "Feature info ~ Beta(%s,%s): min=%.4f  p50=%.4f  mean=%.4f  max=%.4f",
-        cfg["dgp"]["info_dist"]["a"],
-        cfg["dgp"]["info_dist"]["b"],
+        cfg["population"]["info_dist"]["a"],
+        cfg["population"]["info_dist"]["b"],
         info_df["info"].min(),
         info_df["info"].median(),
         info_df["info"].mean(),
@@ -180,11 +181,11 @@ def run() -> None:
     log.saved("fig_info_hist.png")
 
     log.info(
-        "DGP: %d features ~ Beta(%.1f,%.1f), p_pos=%.2f",
+        "population: %d features ~ Beta(%.1f,%.1f), p_pos=%.2f",
         len(features),
-        cfg["dgp"]["info_dist"]["a"],
-        cfg["dgp"]["info_dist"]["b"],
-        cfg["dgp"]["p_pos"],
+        cfg["population"]["info_dist"]["a"],
+        cfg["population"]["info_dist"]["b"],
+        cfg["population"]["p_pos"],
     )
     log.info(
         "Sweep n_train=%s, n_test=%d, n_repeats=%d, setups=%s",
@@ -198,7 +199,7 @@ def run() -> None:
         log.section("n_train = %d (%d/%d)", n_train, i + 1, len(sweep_values))
 
         train_seed = seeds["train"] + i * 7
-        df_train = dgp.sample(n_train, train_seed)
+        df_train = population.sample(n_train, train_seed)
         y_train = df_train["y"].to_numpy()
         log.info(
             "train: n=%d  pos_rate=%.3f",
@@ -225,7 +226,7 @@ def run() -> None:
 
         for repeat in range(1, n_repeats + 1):
             test_seed = seeds["test_base"] + i * 1_000 + repeat
-            df_test = dgp.sample(n_test, test_seed)
+            df_test = population.sample(n_test, test_seed)
             y_test = df_test["y"].to_numpy()
 
             for name, model in fitted.items():
@@ -447,12 +448,12 @@ def write_report(
     lines.append("# Weak Features (Beta‑distributed info) — Report\n")
     lines.append(
         "Research question: with 100 features whose information levels are "
-        f"drawn from Beta({cfg['dgp']['info_dist']['a']}, "
-        f"{cfg['dgp']['info_dist']['b']}) "
+        f"drawn from Beta({cfg['population']['info_dist']['a']}, "
+        f"{cfg['population']['info_dist']['b']}) "
         f"(mean ≈ {info_df['info'].mean():.3f}, "
         f"p50 ≈ {info_df['info'].median():.3f}, "
         f"max ≈ {info_df['info'].max():.3f}, "
-        f"p_pos={cfg['dgp']['p_pos']}), how does training size drive the "
+        f"p_pos={cfg['population']['p_pos']}), how does training size drive the "
         f"gap between CatBoost and the interpretable rule/tree models?\n"
     )
     lines.append(
@@ -523,8 +524,8 @@ def write_report(
 
     lines.append("## Outputs\n")
     lines.append("- `feature_info.csv` — per‑feature info_j ~ "
-                 f"Beta({cfg['dgp']['info_dist']['a']}, "
-                 f"{cfg['dgp']['info_dist']['b']})")
+                 f"Beta({cfg['population']['info_dist']['a']}, "
+                 f"{cfg['population']['info_dist']['b']})")
     lines.append("- `fig_info_hist.png` — histogram of sampled info levels")
     lines.append("- `scores.csv` — long‑format per‑repeat scores")
     lines.append("- `summary.csv` — mean ± 95% CI per (setup, n_train)")
@@ -541,3 +542,4 @@ def write_report(
 
 if __name__ == "__main__":
     run()
+    record(Run(SCRIPT_DIR))  # run_meta.json: config, seed, git revision, packages

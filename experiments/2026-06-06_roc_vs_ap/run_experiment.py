@@ -19,8 +19,6 @@ from __future__ import annotations
 import argparse
 import json
 import logging
-import sys
-import types
 from pathlib import Path
 from typing import Any
 
@@ -32,21 +30,16 @@ matplotlib.use("Agg")          # non-interactive backend; safe in scripts
 import matplotlib.pyplot as plt
 import yaml
 
+# ── reuse ml_elements building blocks ─────────────────────────────────────────
+from sklearn.ensemble import HistGradientBoostingClassifier
+
+from ml_elements.metrics import AUC, AVG_PRECISION
+from ml_elements.models import make_sklearn
+from ml_elements.population import GaussianPopulation
+from ml_elements.run import Run, record
+
 # ── paths ─────────────────────────────────────────────────────────────────────
 SCRIPT_DIR = Path(__file__).resolve().parent
-REPO_ROOT  = SCRIPT_DIR.parents[1]          # experiments/2026-06-06_roc_vs_ap/../../ → root
-
-# ── stub missing optional dependency so ml_elements imports cleanly ───────────
-_stub = types.ModuleType("bayesian_ap_comparator")
-_stub.BayesianAPComparator = object          # never called; just silences the import
-sys.modules.setdefault("bayesian_ap_comparator", _stub)
-
-# ── reuse ml_elements building blocks ─────────────────────────────────────────
-from sklearn.ensemble import HistGradientBoostingClassifier  # noqa: E402
-
-from ml_elements.dgp import GaussianBinaryDGP  # noqa: E402
-from ml_elements.metrics import AUC, AVG_PRECISION  # noqa: E402
-from ml_elements.models import make_sklearn  # noqa: E402
 
 # ── logging ───────────────────────────────────────────────────────────────────
 logging.basicConfig(
@@ -120,7 +113,7 @@ def build_conditions(base_cfg: dict, study_cfg: dict) -> list[dict]:
         info             feature → separation dict
         condition_value  the swept parameter value (for labelling/grouping)
     """
-    base_info = dict(base_cfg["dgp"]["info"])
+    base_info = dict(base_cfg["population"]["info"])
     study = study_cfg["study"]
     conditions = []
 
@@ -166,7 +159,7 @@ def run_condition(
     """
     Fit every model on one shared training set; score on n_repeats test draws.
 
-    Uses GaussianBinaryDGP from ml_elements.dgp.
+    Uses GaussianPopulation from ml_elements.population.
     Returns tidy DataFrame — one row per (model, repeat).
     """
     # Keep config name → Metric pairs so columns are named by the config key
@@ -174,9 +167,9 @@ def run_condition(
     metrics = [(cfg_name, _METRIC_OBJS[cfg_name]) for cfg_name in metric_names]
     feature_cols = list(info.keys())
 
-    dgp = GaussianBinaryDGP(p_pos=p_pos, info=info, sigma=sigma)
+    population = GaussianPopulation(p_pos=p_pos, info=info, sigma=sigma)
 
-    df_train = dgp.sample(n_train, seed=seed_train)
+    df_train = population.sample(n_train, seed=seed_train)
     X_tr = df_train[feature_cols].values
     y_tr = df_train["y"].values
 
@@ -188,7 +181,7 @@ def run_condition(
 
     rows = []
     for rep in range(n_repeats):
-        df_test = dgp.sample(n_test, seed=seed_test_base + rep)
+        df_test = population.sample(n_test, seed=seed_test_base + rep)
         X_te = df_test[feature_cols].values
         y_te = df_test["y"].values
 
@@ -515,7 +508,7 @@ def write_report(
 ) -> None:
     """Write outputs/report.md with embedded plot references."""
     data    = cfg["data"]
-    dgp     = cfg["dgp"]
+    population     = cfg["population"]
     models  = cfg["models"]
     metrics = cfg["metrics"]
     s1      = study1_cfg["study"]
@@ -527,7 +520,7 @@ def write_report(
     lbl_c   = models[mnames[2]]["label"] if len(mnames) > 2 else ""
     lam_c   = models[mnames[2]].get("penalty_lambda", "?") if len(mnames) > 2 else ""
 
-    info_str = ", ".join(f"`{k}`={v}" for k, v in dgp["info"].items())
+    info_str = ", ".join(f"`{k}`={v}" for k, v in population["info"].items())
     table1   = _md_table(summary1, s1["condition_col"], metrics)
     table2   = _md_table(summary2, s2["condition_col"], metrics)
 
@@ -542,9 +535,9 @@ def write_report(
 
 | Parameter | Value |
 | --- | --- |
-| DGP | Gaussian binary: `xj \\| y=k ~ N(k·info_j, σ)` |
+| population | Gaussian binary: `xj \\| y=k ~ N(k·info_j, σ)` |
 | Features | {info_str} |
-| σ (within-class std) | {dgp["sigma"]} |
+| σ (within-class std) | {population["sigma"]} |
 | n\\_train | {data["n_train"]:,} |
 | n\\_test | {data["n_test"]:,} |
 | n\\_repeats | {data["n_repeats"]} independent test draws per condition |
@@ -557,13 +550,12 @@ criterion differs.
 
 ### Composite Objective
 
-The `{lbl_c}` model uses an `Objective` built with the composable
-`ml_elements.objectives` abstraction:
+The `{lbl_c}` model stops early on a custom scorer (`_make_penalized_scorer`
+in `run_experiment.py`) equal to this composite metric:
 
 ```python
-from ml_elements import AVG_PRECISION
-from ml_elements.objectives import N_ITER
-obj = AVG_PRECISION - {lam_c} * N_ITER
+from ml_elements import AVG_PRECISION, N_ITER
+objective = AVG_PRECISION - {lam_c} * N_ITER
 ```
 
 The HGB early-stopping scorer evaluates `AP − λ·N_iter` on the held-out
@@ -616,7 +608,7 @@ than AUC, pulling points below the diagonal and opening a large gap.
 ![Metric scores vs info scale](fig2_metrics_vs_info.png)
 
 **How to read this chart:** The info scale multiplies the base feature
-separation (`x1_base={dgp["info"]["x1"]}`, `x2_base={dgp["info"]["x2"]}`).
+separation (`x1_base={population["info"]["x1"]}`, `x2_base={population["info"]["x2"]}`).
 At scale 0.10 the features are near-noise; at scale 1.80 the classes are
 clearly separable.
 
@@ -733,7 +725,7 @@ def main() -> None:
     model_cfgs    = cfg["models"]
     model_factories = {name: build_model_factory(mc) for name, mc in model_cfgs.items()}
     metric_names  = cfg["metrics"]
-    sigma         = cfg["dgp"].get("sigma", 1.0)
+    sigma         = cfg["population"].get("sigma", 1.0)
 
     # ── Study 1 ───────────────────────────────────────────────────────────────
     s1      = s1_cfg["study"]
@@ -788,7 +780,7 @@ def main() -> None:
 
     # ── plots ─────────────────────────────────────────────────────────────────
     log.info("=== Plots ===")
-    info_str = ", ".join(f"{k}={v}" for k, v in cfg["dgp"]["info"].items())
+    info_str = ", ".join(f"{k}={v}" for k, v in cfg["population"]["info"].items())
 
     plot_metrics_vs_condition(
         df=df1, condition_col=s1["condition_col"],
@@ -847,3 +839,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+    record(Run(SCRIPT_DIR))  # run_meta.json: config, seed, git revision, packages

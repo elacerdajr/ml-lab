@@ -11,7 +11,7 @@ study:
   condition_col: p_pos
   xlabel: "Positive Fraction  (p_pos)"
 
-  # Scale applied to config.dgp.info (1.0 = use base values unchanged)
+  # Scale applied to config.population.info (1.0 = use base values unchanged)
   info_scale: 1.0
 
   # Grid of positive-fraction values to sweep

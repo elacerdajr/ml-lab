@@ -7,7 +7,7 @@ When the feature set is wide but weak (100 features, each with information
 0.10), how does training sample size drive the gap between a high-capacity
 booster (CatBoost) and interpretable rule/tree models (FIGS,
 GreedyRuleList, plain DecisionTree)? Logistic regression serves as the
-near-Bayes reference (the DGP is linear in the features).
+near-Bayes reference (the population is linear in the features).
 
 The single sweep axis is ``n_train``; everything else is fixed. OOS metrics
 are computed on a large, repeated test draw so test-side noise is negligible.
@@ -18,7 +18,7 @@ We do not use ``ml_elements.TrialRunner`` here because it would abort an
 entire trial if any one setup's ``fit`` raised (FIGS and GreedyRuleList
 can be unstable at ``n_train = 200``). Instead we run a thin manual loop
 that isolates per-setup failures and records NaN, then reuse
-``ml_elements``' DGPs, metrics, model factories, and plotting utilities.
+``ml_elements``' populations, metrics, model factories, and plotting utilities.
 
 Usage
 ~~~~~
@@ -39,18 +39,19 @@ import numpy as np
 import pandas as pd
 import yaml
 
-warnings.filterwarnings("ignore")
-
-SCRIPT_DIR = Path(__file__).resolve().parent
-REPO_ROOT = SCRIPT_DIR.parents[1]
-
-import ml_elements as mle  # noqa: E402
-from ml_elements import (  # noqa: E402
+import ml_elements as mle
+from ml_elements import (
     AUC,
     AVG_PRECISION,
     BRIER,
-    GaussianBinaryDGP,
+    GaussianPopulation,
 )
+from ml_elements.run import Run, record
+
+warnings.filterwarnings("ignore")
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+
 
 OUT_DIR = SCRIPT_DIR / "outputs"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -73,16 +74,16 @@ def load_config() -> dict:
     return yaml.safe_load(cfg_path.read_text())
 
 
-def build_dgp(cfg: dict) -> tuple[GaussianBinaryDGP, list[str]]:
-    n_feat = cfg["dgp"]["n_features"]
+def build_population(cfg: dict) -> tuple[GaussianPopulation, list[str]]:
+    n_feat = cfg["population"]["n_features"]
     features = [f"x{i:02d}" for i in range(n_feat)]
-    info = {f: cfg["dgp"]["info_per_feature"] for f in features}
-    dgp = GaussianBinaryDGP(
-        p_pos=cfg["dgp"]["p_pos"],
+    info = {f: cfg["population"]["info_per_feature"] for f in features}
+    population = GaussianPopulation(
+        p_pos=cfg["population"]["p_pos"],
         info=info,
-        sigma=cfg["dgp"]["sigma"],
+        sigma=cfg["population"]["sigma"],
     )
-    return dgp, features
+    return population, features
 
 
 def build_factories(cfg: dict) -> dict:
@@ -147,7 +148,7 @@ def extract_capacity(model) -> float | None:
 
 def run() -> None:
     cfg = load_config()
-    dgp, features = build_dgp(cfg)
+    population, features = build_population(cfg)
     factories = build_factories(cfg)
     metrics = build_metrics(cfg)
 
@@ -157,8 +158,8 @@ def run() -> None:
     n_repeats: int = cfg["data"]["n_repeats"]
 
     log.info(
-        "DGP: %d weak features (info=%.2f), p_pos=%.2f",
-        len(features), cfg["dgp"]["info_per_feature"], cfg["dgp"]["p_pos"],
+        "population: %d weak features (info=%.2f), p_pos=%.2f",
+        len(features), cfg["population"]["info_per_feature"], cfg["population"]["p_pos"],
     )
     log.info(
         "Sweep n_train=%s, n_test=%d, n_repeats=%d, setups=%s",
@@ -172,7 +173,7 @@ def run() -> None:
         log.info("=== n_train = %d (%d/%d) ===", n_train, i + 1, len(sweep_values))
 
         train_seed = seeds["train"] + i * 7
-        df_train = dgp.sample(n_train, train_seed)
+        df_train = population.sample(n_train, train_seed)
         y_train = df_train["y"].to_numpy()
         log.info(
             "  train sample: n=%d  positive_rate=%.3f",
@@ -199,7 +200,7 @@ def run() -> None:
 
         for repeat in range(1, n_repeats + 1):
             test_seed = seeds["test_base"] + i * 1_000 + repeat
-            df_test = dgp.sample(n_test, test_seed)
+            df_test = population.sample(n_test, test_seed)
             y_test = df_test["y"].to_numpy()
 
             for name, model in fitted.items():
@@ -424,8 +425,8 @@ def write_report(
     lines.append("# Weak Features × Sample Size — Report\n")
     lines.append(
         "Research question: with 100 weakly-informative features "
-        f"(info={cfg['dgp']['info_per_feature']} per feature, "
-        f"p_pos={cfg['dgp']['p_pos']}), how does training size drive the "
+        f"(info={cfg['population']['info_per_feature']} per feature, "
+        f"p_pos={cfg['population']['p_pos']}), how does training size drive the "
         f"gap between CatBoost and the interpretable rule/tree models?\n"
     )
     lines.append(
@@ -496,3 +497,4 @@ def write_report(
 
 if __name__ == "__main__":
     run()
+    record(Run(SCRIPT_DIR))  # run_meta.json: config, seed, git revision, packages

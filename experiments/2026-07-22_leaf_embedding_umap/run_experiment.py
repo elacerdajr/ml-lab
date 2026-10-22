@@ -28,15 +28,18 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import yaml
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.neural_network import MLPClassifier
 from sklearn.svm import SVC
 
-from ml_elements.dgp import GaussianBinaryDGP, ShiftedDGP
 from ml_elements.metrics import AUC, AVG_PRECISION
-from ml_elements.models import make_catboost, make_logistic, make_sklearn
+from ml_elements.models import embed_leaves, make_catboost, make_logistic, make_sklearn
+from ml_elements.population import GaussianPopulation, ShiftedPopulation
+from ml_elements.run import Run, record
 
 SCRIPT_DIR = Path(__file__).parent
+CONFIG = yaml.safe_load((SCRIPT_DIR / "config.yaml").read_text())
 OUT_DIR = SCRIPT_DIR / "outputs"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -52,25 +55,19 @@ log = logging.getLogger(__name__)
 # Configuration
 # ---------------------------------------------------------------------------
 
-P_POS = 0.05
-N_TRAIN = 4_000
-N_TEST = 4_000
-SEED = 42
-K_VALUES = [2, 5, 10, 20]
+P_POS = CONFIG["p_pos"]
+N_TRAIN = CONFIG["n_train"]
+N_TEST = CONFIG["n_test"]
+SEED = CONFIG["seed"]
+K_VALUES = CONFIG["k_values"]
 
-NUMERIC_INFO = {"num_x1": 1.2, "num_x2": 0.6, "num_x3": 0.2}
-CATEGORICAL_INFO = {"cat_x1": 1.0, "cat_x2": 0.5, "cat_x3": 0.1}
+NUMERIC_INFO = CONFIG["numeric_info"]
+CATEGORICAL_INFO = CONFIG["categorical_info"]
 CAT_COLS = list(CATEGORICAL_INFO.keys())
 
-# Fixed z-score cut points per categorical column -> deterministic bin
-# labels regardless of which sample (train/test) they're applied to.
-BIN_EDGES = {
-    "cat_x1": [-1.0, 0.0, 1.0],           # 4 categories
-    "cat_x2": [-0.5, 0.5],                # 3 categories
-    "cat_x3": [-1.0, -0.33, 0.33, 1.0],   # 5 categories
-}
+BIN_EDGES = CONFIG["bin_edges"]
 
-EXTRACTOR_CFG = dict(iterations=300, depth=6, learning_rate=0.05)
+EXTRACTOR_CFG = CONFIG["extractor_cfg"]
 
 DOWNSTREAM_FACTORIES = {
     "logit": make_logistic(),
@@ -126,13 +123,13 @@ def _binize(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def _build_dgp() -> ShiftedDGP:
-    base = GaussianBinaryDGP(
+def _build_population() -> ShiftedPopulation:
+    base = GaussianPopulation(
         p_pos=P_POS,
         info={**NUMERIC_INFO, **CATEGORICAL_INFO},
         sigma=1.0,
     )
-    return ShiftedDGP(base=base, shift_fn=_binize)
+    return ShiftedPopulation(base=base, shift_fn=_binize)
 
 
 # ---------------------------------------------------------------------------
@@ -149,10 +146,6 @@ def _fit_native_catboost(X_train: pd.DataFrame, y_train: np.ndarray, cat_idx: li
     )
     model.fit(Pool(X_train, label=y_train, cat_features=cat_idx))
     return model
-
-
-def _leaf_embeddings(model: object, pool: Pool) -> np.ndarray:
-    return model.calc_leaf_indexes(pool).astype(np.float32)
 
 
 def _umap_reduce(emb_train: np.ndarray, emb_test: np.ndarray, k: int) -> tuple[np.ndarray, np.ndarray]:
@@ -263,7 +256,7 @@ def _write_report(df: pd.DataFrame, baseline: dict, n_trees: int, baseline_fit_s
         "",
         "| Parameter | Value |",
         "|-----------|-------|",
-        "| DGP | GaussianBinaryDGP + ShiftedDGP (fixed-edge binning) |",
+        "| population | GaussianPopulation + ShiftedPopulation (fixed-edge binning) |",
         f"| p_pos | {P_POS} |",
         f"| Numeric features | {', '.join(f'{k} (info={v})' for k, v in NUMERIC_INFO.items())} |",
         f"| Categorical features | {', '.join(f'{k} (info={v})' for k, v in CATEGORICAL_INFO.items())} |",
@@ -393,11 +386,11 @@ def main() -> None:
         log.error("umap-learn not installed. Run: uv sync --extra umap")
         sys.exit(1)
 
-    dgp = _build_dgp()
+    population = _build_population()
 
     log.info("Generating data — n_train=%d  n_test=%d  p_pos=%.3f", N_TRAIN, N_TEST, P_POS)
-    df_train = dgp.sample(n=N_TRAIN, seed=SEED)
-    df_test = dgp.sample(n=N_TEST, seed=SEED + 1_000)
+    df_train = population.sample(n=N_TRAIN, seed=SEED)
+    df_test = population.sample(n=N_TEST, seed=SEED + 1_000)
 
     y_train = df_train["y"].values
     y_test = df_test["y"].values
@@ -420,8 +413,8 @@ def main() -> None:
     log.info("  native CatBoost — AUC=%.4f  AP=%.4f  fit=%.4fs", baseline_auc, baseline_ap, baseline_fit_seconds)
 
     log.info("Extracting leaf embeddings …")
-    leaves_train = _leaf_embeddings(native_model, pool_train)
-    leaves_test = _leaf_embeddings(native_model, pool_test)
+    leaves_train = embed_leaves(native_model, pool_train)
+    leaves_test = embed_leaves(native_model, pool_test)
     n_trees = leaves_train.shape[1]
     log.info("  leaf-embedding shape: train=%s test=%s (n_trees=%d)", leaves_train.shape, leaves_test.shape, n_trees)
 
@@ -468,3 +461,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+    record(Run(SCRIPT_DIR))  # run_meta.json: config, seed, git revision, packages

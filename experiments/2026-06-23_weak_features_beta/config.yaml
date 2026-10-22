@@ -33,11 +33,11 @@ data:
     valid: 202
     test_base: 10000
 
-# ── DGP ───────────────────────────────────────────────────────────────────
+# ── Population ───────────────────────────────────────────────────────────────────
 # 100 features, each receiving an independent draw from Beta(a=1, b=9).
-# The info levels are sampled once with a fixed seed so the DGP is
+# The info levels are sampled once with a fixed seed so the population is
 # deterministic across the experiment.
-dgp:
+population:
   p_pos: 0.01
   sigma: 1.0
   n_features: 100

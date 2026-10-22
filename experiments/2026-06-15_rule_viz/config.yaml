@@ -1,0 +1,9 @@
+# 2026-06-15_rule_viz: settings read by run_experiment.py
+
+seed: 42
+
+n_train: 2000
+
+n_test: 10000
+
+feature_names: [age, income_k, credit_score, n_transactions, is_mobile]

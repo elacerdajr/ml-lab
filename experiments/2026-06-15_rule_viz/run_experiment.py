@@ -8,7 +8,7 @@ HTML report using D3.js.
 The data-generating process has named, meaningful features so the extracted
 rules read like real business logic rather than raw array indices.
 
-DGP
+population
 ---
 Features: age, income_k, credit_score, n_transactions, is_mobile (binary)
 Target:   fraud (binary)
@@ -41,16 +41,18 @@ import warnings
 from pathlib import Path
 
 import numpy as np
+import yaml
 from sklearn.metrics import roc_auc_score
 from sklearn.tree import DecisionTreeClassifier
 
 from ml_elements.rule_viz import save_rule_report
 from ml_elements.rules import RuleExtractor
+from ml_elements.run import Run, record
 
 warnings.filterwarnings("ignore")
 
 SCRIPT_DIR = Path(__file__).resolve().parent
-REPO_ROOT = SCRIPT_DIR.parents[1]
+CONFIG = yaml.safe_load((SCRIPT_DIR / "config.yaml").read_text())
 
 
 try:
@@ -69,14 +71,14 @@ logging.basicConfig(
 )
 log = logging.getLogger(__name__)
 
-SEED = 42
-N_TRAIN = 2_000
-N_TEST = 10_000
+SEED = CONFIG["seed"]
+N_TRAIN = CONFIG["n_train"]
+N_TEST = CONFIG["n_test"]
 
-FEATURE_NAMES = ["age", "income_k", "credit_score", "n_transactions", "is_mobile"]
+FEATURE_NAMES = CONFIG["feature_names"]
 
 
-# ─── DGP ────────────────────────────────────────────────────────────────────
+# ─── Population ────────────────────────────────────────────────────────────────────
 
 
 def _sigmoid(x: np.ndarray) -> np.ndarray:
@@ -230,7 +232,7 @@ with human-readable features:
 | `n_transactions` | Transactions in the last month |
 | `is_mobile` | 1 if mobile device, 0 otherwise |
 
-**True DGP (approximate):**
+**True population (approximate):**
 ```
 logit = −0.03·age − 0.008·income_k − 0.003·credit_score
         + 0.12·n_transactions + 0.9·is_mobile + 4.0
@@ -320,3 +322,4 @@ experiments/2026-06-15_rule_viz/
 
 if __name__ == "__main__":
     run()
+    record(Run(SCRIPT_DIR))  # run_meta.json: config, seed, git revision, packages

@@ -52,13 +52,16 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import yaml
 from matplotlib.lines import Line2D
 from sklearn.calibration import calibration_curve
 from sklearn.metrics import average_precision_score, brier_score_loss, roc_auc_score
 
-from ml_elements.dgp import GaussianBinaryDGP
+from ml_elements.population import GaussianPopulation
+from ml_elements.run import Run, record
 
 SCRIPT_DIR = Path(__file__).parent
+CONFIG = yaml.safe_load((SCRIPT_DIR / "config.yaml").read_text())
 OUT_DIR = SCRIPT_DIR / "outputs"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -74,18 +77,18 @@ log = logging.getLogger(__name__)
 # Configuration
 # ---------------------------------------------------------------------------
 
-NOISE_LEVELS = [0.10, 0.20, 0.30, 0.40, 0.50]
+NOISE_LEVELS = CONFIG["noise_levels"]
 
-FEATURE_INFO = {"x1": 1.5, "x2": 1.0, "x3": 0.6, "x4": 0.3, "x5": 0.1}
+FEATURE_INFO = CONFIG["feature_info"]
 
-P_POS = 0.35
-N_TRAIN = 3_000
-N_TEST = 2_000
-SEED = 42
+P_POS = CONFIG["p_pos"]
+N_TRAIN = CONFIG["n_train"]
+N_TEST = CONFIG["n_test"]
+SEED = CONFIG["seed"]
 
-CATBOOST_PARAMS = dict(iterations=300, depth=4, learning_rate=0.06)
+CATBOOST_PARAMS = CONFIG["catboost_params"]
 
-DGP = GaussianBinaryDGP(p_pos=P_POS, info=FEATURE_INFO, sigma=1.0)
+population = GaussianPopulation(p_pos=P_POS, info=FEATURE_INFO, sigma=1.0)
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -503,7 +506,7 @@ def _write_report(rows: list[dict], hard_metrics: dict, img_prefix: str = "outpu
         "",
         "| Parameter | Value |",
         "|-----------|-------|",
-        "| DGP | GaussianBinaryDGP |",
+        "| population | GaussianPopulation |",
         f"| p_pos | {P_POS} |",
         "| Features | " + ", ".join(f"{k} (info={v})" for k, v in FEATURE_INFO.items()) + " |",
         f"| n_train / n_test | {N_TRAIN:,} / {N_TEST:,} |",
@@ -696,8 +699,8 @@ def main() -> None:
         sys.exit(1)
 
     log.info("Generating data — n_train=%d  n_test=%d  p_pos=%.2f", N_TRAIN, N_TEST, P_POS)
-    df_train = DGP.sample(n=N_TRAIN, seed=SEED)
-    df_test = DGP.sample(n=N_TEST, seed=SEED + 1_000)
+    df_train = population.sample(n=N_TRAIN, seed=SEED)
+    df_test = population.sample(n=N_TEST, seed=SEED + 1_000)
 
     y_train = df_train["y"].values
     X_train = df_train.drop(columns="y").values
@@ -802,3 +805,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+    record(Run(SCRIPT_DIR))  # run_meta.json: config, seed, git revision, packages
