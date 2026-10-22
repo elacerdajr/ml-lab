@@ -255,18 +255,18 @@ def run() -> None:
 
     scores = pd.DataFrame(score_rows)
     scores.to_csv(OUT_DIR / "scores.csv", index=False)
-    log.saved("scores.csv", "%d rows" % len(scores))
+    log.saved("scores.csv", f"{len(scores)} rows")
 
     if capacity_rows:
         cap_df = pd.DataFrame(capacity_rows)
         cap_df.to_csv(OUT_DIR / "capacity.csv", index=False)
-        log.saved("capacity.csv", "%d rows" % len(cap_df))
+        log.saved("capacity.csv", f"{len(cap_df)} rows")
     else:
         cap_df = pd.DataFrame()
 
     summary = make_summary(scores, metrics)
     summary.to_csv(OUT_DIR / "summary.csv", index=False)
-    log.saved("summary.csv", "%d rows" % len(summary))
+    log.saved("summary.csv", f"{len(summary)} rows")
 
     log.step("Plotting & report")
     plot_learning_curves(scores, cfg, metrics)
@@ -473,7 +473,7 @@ def write_report(
         f"| max | {info_df['info'].max():.4f} |\n"
         f"| std | {info_df['info'].std():.4f} |\n"
     )
-    lines.append(f"![info histogram](fig_info_hist.png)\n")
+    lines.append("![info histogram](fig_info_hist.png)\n")
 
     lines.append("## Headline: ROC‑AUC at the largest training size "
                  f"(n_train={n_max})\n")

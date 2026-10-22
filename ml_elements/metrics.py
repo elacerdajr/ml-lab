@@ -29,7 +29,7 @@ Any callable (y_true, y_score) -> float can be wrapped:
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Callable, Literal
+from typing import Literal
 
 import numpy as np
 from sklearn.metrics import average_precision_score, brier_score_loss, log_loss, roc_auc_score

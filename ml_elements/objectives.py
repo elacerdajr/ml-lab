@@ -41,8 +41,9 @@ COEF_L1     L1 norm of linear coefficients (LogisticRegression).
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any, Callable, Literal
+from typing import Any, Literal
 
 import numpy as np
 
@@ -100,7 +101,7 @@ class ModelMetric:
 
     # ── promote to Objective for arithmetic ───────────────────────────────────
 
-    def _as_obj(self) -> "Objective":
+    def _as_obj(self) -> Objective:
         return Objective(
             name=self.name,
             direction=self.direction,
@@ -198,18 +199,18 @@ class Objective:
 
     # ── convenience ───────────────────────────────────────────────────────────
 
-    def rename(self, name: str) -> "Objective":
+    def rename(self, name: str) -> Objective:
         """Return a copy with a new name (does not mutate)."""
         return Objective(name=name, direction=self.direction, terms=self.terms)
 
-    def with_direction(self, direction: Literal["higher", "lower"]) -> "Objective":
+    def with_direction(self, direction: Literal["higher", "lower"]) -> Objective:
         """Return a copy with a different optimisation direction."""
         return Objective(name=self.name, direction=direction, terms=self.terms)
 
     # ── internal coercion ─────────────────────────────────────────────────────
 
     @staticmethod
-    def _coerce(other: Any) -> "Objective":
+    def _coerce(other: Any) -> Objective:
         """Convert Metric / ModelMetric / scalar to Objective."""
         if isinstance(other, Objective):
             return other
@@ -234,7 +235,7 @@ class Objective:
             f"Cannot combine Objective with {type(other).__name__!r}"
         )
 
-    def _merge(self, other: Any, sign: float) -> "Objective":
+    def _merge(self, other: Any, sign: float) -> Objective:
         rhs  = Objective._coerce(other)
         name = (
             f"{self.name} + {rhs.name}"
@@ -258,7 +259,7 @@ class Objective:
     def __rsub__(self, other):
         return Objective._coerce(other).__sub__(self)
 
-    def __mul__(self, scalar: float) -> "Objective":
+    def __mul__(self, scalar: float) -> Objective:
         if not isinstance(scalar, (int, float)):
             raise TypeError(f"Can only multiply Objective by a scalar, got {type(scalar).__name__!r}")
         s    = float(scalar)
@@ -272,15 +273,15 @@ class Objective:
             terms=tuple((w * s, fn) for w, fn in self.terms),
         )
 
-    def __rmul__(self, scalar: float) -> "Objective":
+    def __rmul__(self, scalar: float) -> Objective:
         return self.__mul__(scalar)
 
-    def __truediv__(self, scalar: float) -> "Objective":
+    def __truediv__(self, scalar: float) -> Objective:
         if not isinstance(scalar, (int, float)) or scalar == 0:
             raise TypeError("Divisor must be a non-zero scalar")
         return self.__mul__(1.0 / float(scalar))
 
-    def __neg__(self) -> "Objective":
+    def __neg__(self) -> Objective:
         return self.__mul__(-1.0)
 
 

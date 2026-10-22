@@ -35,21 +35,19 @@ Usage
 
 from __future__ import annotations
 
-import json
 import logging
-import sys
 from pathlib import Path
 from typing import Any
 
+import matplotlib
 import numpy as np
 import pandas as pd
-import matplotlib
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import average_precision_score, roc_auc_score
 from sklearn.tree import DecisionTreeClassifier
-from sklearn.metrics import roc_auc_score, average_precision_score
 
 try:
     import imodels
@@ -415,7 +413,7 @@ def _bar_group(
             sel = df[(df["scenario"] == s) & (df["model"] == mname)][metric].values
             vals.append(float(sel[0]) if len(sel) > 0 else np.nan)
         offset = (i - n_mod / 2 + 0.5) * width
-        bars = ax.bar(
+        ax.bar(
             x + offset, vals,
             width=width * 0.92,
             color=_MODEL_COLORS[mname],

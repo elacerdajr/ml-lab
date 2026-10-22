@@ -30,12 +30,11 @@ plot_score_distributions
 
 from __future__ import annotations
 
-from typing import Sequence
+from collections.abc import Sequence
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-import matplotlib.ticker as mticker
 from matplotlib.figure import Figure
 
 from .metrics import Metric
@@ -393,7 +392,7 @@ def plot_score_distributions(
             ].values
             if len(vals) == 0:
                 continue
-            bp = ax.boxplot(
+            ax.boxplot(
                 vals,
                 positions=[ti + offset],
                 widths=width * 0.85,

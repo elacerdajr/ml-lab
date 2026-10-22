@@ -49,16 +49,16 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
-from ml_elements.rules import RuleExtractor
 from ml_elements.rule_viz import save_rule_report
+from ml_elements.rules import RuleExtractor
 
 try:
     import imodels
 except ImportError as exc:
     raise ImportError("pip install imodels") from exc
 
-from sklearn.tree import DecisionTreeClassifier
 from sklearn.metrics import roc_auc_score
+from sklearn.tree import DecisionTreeClassifier
 
 OUT_DIR = SCRIPT_DIR / "outputs"
 OUT_DIR.mkdir(parents=True, exist_ok=True)

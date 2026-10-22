@@ -62,17 +62,20 @@ Manual ablation — three explicit points:
 
 from __future__ import annotations
 
-from typing import Callable, Optional
+from collections.abc import Callable
+from typing import TYPE_CHECKING
 
 import numpy as np
 
 from .protocols import DGP, ModelBackend
 from .trial import Trial
 
+if TYPE_CHECKING:
+    import pandas as pd
 
 _DGPFactory = Callable[[dict[str, float]], DGP]
 _ModelFactory = Callable[[], ModelBackend]
-_ModelFn = Optional[Callable[[dict[str, float]], _ModelFactory]]
+_ModelFn = Callable[[dict[str, float]], _ModelFactory] | None
 
 
 def _make_trial(
@@ -186,7 +189,7 @@ class SobolSearch:
 
         return result
 
-    def param_dataframe(self) -> "pd.DataFrame":
+    def param_dataframe(self) -> pd.DataFrame:
         """
         Return a DataFrame of the sampled parameter values (for inspection).
         Requires the same scipy version as ``trials()``.
@@ -255,7 +258,6 @@ class RandomSearch:
         list[Trial]
         """
         rng = np.random.default_rng(self.seed)
-        names = list(self.param_space.keys())
 
         result = []
         for i in range(self.n_points):

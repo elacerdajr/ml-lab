@@ -96,7 +96,10 @@ select = [
 ]
 ignore = [
     "E501",  # line length handled by formatter
+    "B905",  # zip(strict=) — adding strict=True to existing experiment code could change behaviour
 ]
 
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401"]
+# Notebook cells import after setup cells and use compact one-liners.
+"*.ipynb" = ["E402", "E701", "E702"]

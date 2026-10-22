@@ -23,6 +23,7 @@ import time
 from pathlib import Path
 
 import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
@@ -37,8 +38,8 @@ OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 sys.path.insert(0, str(SCRIPT_DIR.parent.parent))
 from ml_elements.dgp import GaussianBinaryDGP, ShiftedDGP
-from ml_elements.models import make_catboost, make_logistic, make_sklearn
 from ml_elements.metrics import AUC, AVG_PRECISION
+from ml_elements.models import make_catboost, make_logistic, make_sklearn
 
 logging.basicConfig(
     level=logging.INFO,
@@ -150,7 +151,7 @@ def _fit_native_catboost(X_train: pd.DataFrame, y_train: np.ndarray, cat_idx: li
     return model
 
 
-def _leaf_embeddings(model: object, pool: "Pool") -> np.ndarray:
+def _leaf_embeddings(model: object, pool: Pool) -> np.ndarray:
     return model.calc_leaf_indexes(pool).astype(np.float32)
 
 
@@ -373,7 +374,7 @@ def _write_report(df: pd.DataFrame, baseline: dict, n_trees: int, baseline_fit_s
         "",
         "---",
         "",
-        f"Raw data: `outputs/results.csv`",
+        "Raw data: `outputs/results.csv`",
     ]
 
     report_path.write_text("\n".join(lines) + "\n")

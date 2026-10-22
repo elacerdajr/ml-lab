@@ -16,8 +16,8 @@ Trial
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Callable
 
 from .protocols import DGP, ModelBackend
 
@@ -71,7 +71,7 @@ class DataBudget:
                 raise ValueError(f"{attr} must be >= 1, got {getattr(self, attr)}")
 
     @classmethod
-    def quick(cls, n: int = 500, n_repeats: int = 10) -> "DataBudget":
+    def quick(cls, n: int = 500, n_repeats: int = 10) -> DataBudget:
         """
         Convenience constructor for fast prototyping.
 

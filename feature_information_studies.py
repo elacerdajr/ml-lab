@@ -85,16 +85,13 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Dict, List, Optional, Literal
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-
-from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import HistGradientBoostingClassifier
-from sklearn.metrics import roc_auc_score, average_precision_score, log_loss
-
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import average_precision_score, log_loss, roc_auc_score
 
 # =============================================================================
 # 0. Config
@@ -216,7 +213,7 @@ class GaussianBinaryDGP:
     def __init__(
         self,
         p_pos: float,
-        info: Dict[str, float],
+        info: dict[str, float],
         sigma: float = 1.0,
     ):
         self.p_pos = p_pos
@@ -253,7 +250,7 @@ class ModelFactory:
         setup_2 = {x1, x2, x3}
     """
 
-    def __init__(self, config: Dict):
+    def __init__(self, config: dict):
         self.config = config
 
     def create(self):
@@ -325,7 +322,7 @@ class SetupComparator:
 
     def __init__(
         self,
-        setups: Dict[str, List[str]],
+        setups: dict[str, list[str]],
         target_col: str,
         primary_metric: str,
         model_factory: ModelFactory,
@@ -338,7 +335,7 @@ class SetupComparator:
         self.primary_metric = primary_metric
         self.model_factory = model_factory
 
-    def _score_all(self, y_true: np.ndarray, p_hat: np.ndarray) -> Dict[str, float]:
+    def _score_all(self, y_true: np.ndarray, p_hat: np.ndarray) -> dict[str, float]:
         p_hat = np.clip(p_hat, 1e-8, 1 - 1e-8)
 
         return {
@@ -351,7 +348,7 @@ class SetupComparator:
         self,
         df_train: pd.DataFrame,
         df_valid: pd.DataFrame,
-    ) -> Dict[str, object]:
+    ) -> dict[str, object]:
         models = {}
 
         for setup_name, features in self.setups.items():
@@ -371,7 +368,7 @@ class SetupComparator:
 
     def evaluate_once(
         self,
-        models: Dict[str, object],
+        models: dict[str, object],
         df_test: pd.DataFrame,
         condition_name: str,
         condition_value: float,
@@ -465,7 +462,7 @@ class InformationStudyRunner:
         fixed info_x1, info_x2
     """
 
-    def __init__(self, config: Dict):
+    def __init__(self, config: dict):
         self.config = config
         self.output_dir = Path(config["output_dir"])
         self.output_dir.mkdir(parents=True, exist_ok=True)

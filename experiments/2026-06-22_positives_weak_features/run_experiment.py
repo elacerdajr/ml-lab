@@ -34,6 +34,7 @@ from pathlib import Path
 from typing import Any
 
 import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
@@ -343,7 +344,6 @@ def plot_eval_vs_test(scores: pd.DataFrame, cfg: dict, metrics: list) -> None:
         fontsize=12,
     )
 
-    cmap = plt.get_cmap("viridis")
     norm = plt.Normalize(vmin=min(depth_values), vmax=max(depth_values))
 
     eval_df = scores[scores["split"] == "eval"].copy()
@@ -394,7 +394,6 @@ def plot_eval_vs_test(scores: pd.DataFrame, cfg: dict, metrics: list) -> None:
 def plot_depth_lines(scores: pd.DataFrame, cfg: dict, metrics: list) -> None:
     """AP and AUC vs l2_leaf_reg, one line per depth, for each split."""
     depth_values = sorted(cfg["sweep"]["depth"])
-    l2_values = sorted(cfg["sweep"]["l2_leaf_reg"])
 
     for m in metrics:
         fig, axes = plt.subplots(1, 2, figsize=(14, 5.5), sharey=True)
@@ -539,12 +538,12 @@ def write_report(
         best_eval = summary.loc[summary[eval_col].idxmax()]
         best_test = summary.loc[summary[test_col].idxmax()]
 
-        lines.append(f"## Best config by eval AP\n")
+        lines.append("## Best config by eval AP\n")
         lines.append(
             f"depth={int(best_eval['depth'])}, l2_leaf_reg={best_eval['l2_leaf_reg']}  "
             f"→ eval AP={best_eval[eval_col]:.4f}, test AP={best_eval[test_col]:.4f}\n"
         )
-        lines.append(f"## Best config by test AP\n")
+        lines.append("## Best config by test AP\n")
         lines.append(
             f"depth={int(best_test['depth'])}, l2_leaf_reg={best_test['l2_leaf_reg']}  "
             f"→ eval AP={best_test[eval_col]:.4f}, test AP={best_test[test_col]:.4f}\n"

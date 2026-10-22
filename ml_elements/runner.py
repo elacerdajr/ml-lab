@@ -21,8 +21,8 @@ The models in ``TrialResult.models`` are fully accessible after the run:
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Callable
+from collections.abc import Callable
+from dataclasses import dataclass
 
 import pandas as pd
 
@@ -121,8 +121,8 @@ class TrialRunner:
 
     def __init__(
         self,
-        setups: dict[str, "list[str] | tuple[list[str], Callable]"],
-        model_factory: "Callable[[], ModelBackend] | None",
+        setups: dict[str, list[str] | tuple[list[str], Callable]],
+        model_factory: Callable[[], ModelBackend] | None,
         metrics: list[Metric],
         budget: DataBudget,
         target_col: str = "y",
@@ -197,7 +197,7 @@ class TrialRunner:
     def _fit_models(
         self,
         df_train: pd.DataFrame,
-        factory: "Callable[[], ModelBackend] | None",
+        factory: Callable[[], ModelBackend] | None,
     ) -> dict[str, ModelBackend]:
         models: dict[str, ModelBackend] = {}
         y_train = df_train[self.target_col]

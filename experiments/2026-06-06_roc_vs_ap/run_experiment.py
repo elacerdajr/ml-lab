@@ -24,12 +24,12 @@ import types
 from pathlib import Path
 from typing import Any
 
+import matplotlib
 import numpy as np
 import pandas as pd
-import matplotlib
+
 matplotlib.use("Agg")          # non-interactive backend; safe in scripts
 import matplotlib.pyplot as plt
-from matplotlib.lines import Line2D
 import yaml
 
 # ── paths ─────────────────────────────────────────────────────────────────────
@@ -43,11 +43,11 @@ _stub.BayesianAPComparator = object          # never called; just silences the i
 sys.modules.setdefault("bayesian_ap_comparator", _stub)
 
 # ── reuse ml_elements building blocks ─────────────────────────────────────────
-from ml_elements.dgp     import GaussianBinaryDGP   # noqa: E402
-from ml_elements.metrics import AUC, AVG_PRECISION  # noqa: E402
-from ml_elements.models  import make_sklearn         # noqa: E402
-
 from sklearn.ensemble import HistGradientBoostingClassifier  # noqa: E402
+
+from ml_elements.dgp import GaussianBinaryDGP  # noqa: E402
+from ml_elements.metrics import AUC, AVG_PRECISION  # noqa: E402
+from ml_elements.models import make_sklearn  # noqa: E402
 
 # ── logging ───────────────────────────────────────────────────────────────────
 logging.basicConfig(
@@ -546,9 +546,9 @@ def write_report(
 | DGP | Gaussian binary: `xj \\| y=k ~ N(k·info_j, σ)` |
 | Features | {info_str} |
 | σ (within-class std) | {dgp["sigma"]} |
-| n\_train | {data["n_train"]:,} |
-| n\_test | {data["n_test"]:,} |
-| n\_repeats | {data["n_repeats"]} independent test draws per condition |
+| n\\_train | {data["n_train"]:,} |
+| n\\_test | {data["n_test"]:,} |
+| n\\_repeats | {data["n_repeats"]} independent test draws per condition |
 | {lbl_a} | HGB `early_stopping=True`, `scoring='roc_auc'` |
 | {lbl_b} | HGB `early_stopping=True`, `scoring='average_precision'` |
 | {lbl_c} | HGB `early_stopping=True`, composite scorer: `AP − {lam_c}·N_iter` |
@@ -591,7 +591,7 @@ across {data["n_repeats"]} independent test draws.
   AUC measures global rank quality and is mathematically invariant to
   class prevalence, so all three models track each other closely at all `p_pos`.
 - **Average Precision (right)** collapses as `p_pos → 0` because AP is a
-  precision-weighted recall curve: even a perfect ranker achieves AP ≈ p\_pos
+  precision-weighted recall curve: even a perfect ranker achieves AP ≈ p\\_pos
   when positives are rare.  The {lbl_b} and {lbl_c} models retain a consistent
   AP advantage at low `p_pos`, confirming that AP-aware objectives pay off
   exactly when the metric penalises imbalance the most.

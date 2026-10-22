@@ -20,6 +20,7 @@ import sys
 from pathlib import Path
 
 import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
@@ -277,7 +278,7 @@ def _write_report(rows: list[dict]) -> None:
         "",
         "| Parameter | Value |",
         "|-----------|-------|",
-        f"| DGP | GaussianBinaryDGP |",
+        "| DGP | GaussianBinaryDGP |",
         f"| p_pos | {P_POS} |",
         "| Features | x1 (info=1.2), x2 (0.8), x3 (0.4), x4 (0.15), x5 (0.05) |",
         f"| n_train / n_test | {N_TRAIN:,} / {N_TEST:,} |",
@@ -393,7 +394,7 @@ def _write_report(rows: list[dict]) -> None:
         "",
         "---",
         "",
-        f"Raw data: `outputs/results.csv`",
+        "Raw data: `outputs/results.csv`",
     ]
 
     report_path.write_text("\n".join(lines) + "\n")
@@ -471,7 +472,6 @@ def main() -> None:
 
         log.info("  extracting leaf embeddings …")
         emb_train = _leaf_embeddings(extractor, X_train)
-        emb_test = _leaf_embeddings(extractor, X_test)
         log.info("  embedding shape: %s", emb_train.shape)
 
         log.info("  computing Hamming distance matrix (%d×%d) …", N_TRAIN, N_TRAIN)

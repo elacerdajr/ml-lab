@@ -32,7 +32,8 @@ from __future__ import annotations
 import contextlib
 import sys
 import time as _time
-from typing import Any, Iterator
+from collections.abc import Iterator
+from typing import Any
 
 # ── optional rich import ────────────────────────────────────────────────────
 try:

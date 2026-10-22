@@ -71,8 +71,7 @@ Typical flow
 """
 
 from .analysis import Comparator
-from .rules import RuleCondition, Rule, RuleSet, RuleExtractor
-from .rule_viz import rule_matrix_html, save_rule_report
+from .dgp import GaussianBinaryDGP, RealDataDGP, ShiftedDGP
 from .embedding_pca import (
     build_embedding_texts,
     encode_with_sentence_transformer,
@@ -81,21 +80,11 @@ from .embedding_pca import (
     plot_first_three_pcs,
     plot_pca_variance,
 )
-from .rich_logger import RichLogger
-from .dgp import GaussianBinaryDGP, RealDataDGP, ShiftedDGP
-from .objectives import (
-    COEF_L1,
-    N_ITER,
-    N_LEAVES,
-    ModelMetric,
-    Objective,
-    make_objective,
-)
 from .metrics import (
     ALL_METRICS,
+    AUC,
     AVG_PRECISION,
     AVG_PRECISION_SMOOTH,
-    AUC,
     BRIER,
     LOGLOSS,
     Metric,
@@ -111,6 +100,14 @@ from .models import (
     make_rule_fit,
     make_sklearn,
 )
+from .objectives import (
+    COEF_L1,
+    N_ITER,
+    N_LEAVES,
+    ModelMetric,
+    Objective,
+    make_objective,
+)
 from .plots import (
     plot_calibration,
     plot_feature_importance,
@@ -119,6 +116,9 @@ from .plots import (
     plot_study,
 )
 from .protocols import DGP, MetricFn, ModelBackend
+from .rich_logger import RichLogger
+from .rule_viz import rule_matrix_html, save_rule_report
+from .rules import Rule, RuleCondition, RuleExtractor, RuleSet
 from .runner import TrialResult, TrialRunner
 from .search import ManualSearch, RandomSearch, SobolSearch
 from .study import Study, StudyResult

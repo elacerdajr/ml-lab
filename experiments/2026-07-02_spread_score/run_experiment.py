@@ -47,6 +47,7 @@ import sys
 from pathlib import Path
 
 import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
@@ -450,7 +451,6 @@ def main() -> None:
 
     y_train = df_train["y"].values
     X_train = df_train.drop(columns="y").values
-    y_test = df_test["y"].values
     X_test = df_test.drop(columns="y").values
 
     rows: list[dict] = []

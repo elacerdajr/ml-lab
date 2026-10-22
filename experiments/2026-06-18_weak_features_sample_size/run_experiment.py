@@ -423,7 +423,7 @@ def write_report(
     head = summary[summary["n_train"] == n_max].set_index("setup")
 
     lines: list[str] = []
-    lines.append(f"# Weak Features × Sample Size — Report\n")
+    lines.append("# Weak Features × Sample Size — Report\n")
     lines.append(
         "Research question: with 100 weakly-informative features "
         f"(info={cfg['dgp']['info_per_feature']} per feature, "

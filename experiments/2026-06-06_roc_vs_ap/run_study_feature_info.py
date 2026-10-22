@@ -32,13 +32,13 @@ _stub.BayesianAPComparator = object
 sys.modules.setdefault("bayesian_ap_comparator", _stub)
 
 from run_experiment import (  # noqa: E402
-    load_yaml,
-    build_model_factory,
     build_conditions,
-    run_study,
+    build_model_factory,
     build_summary,
+    load_yaml,
     plot_metrics_vs_condition,
     plot_score_space,
+    run_study,
 )
 
 logging.basicConfig(
