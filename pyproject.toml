@@ -77,9 +77,15 @@ package = true
 [dependency-groups]
 dev = [
     "ruff>=0.5",
+    "pytest>=8.0",
     "ipykernel>=6.0",
     "ipywidgets>=8.0",
 ]
+
+# ── Tests ───────────────────────────────────────────────────────────────────
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["slow: end-to-end experiment runs (deselect with -m 'not slow')"]
 
 # ── Ruff ────────────────────────────────────────────────────────────────────
 [tool.ruff]

@@ -1,8 +1,21 @@
-.PHONY: exp-roc-vs-ap exp-roc-vs-ap-imbalance exp-roc-vs-ap-info exp-embedding-pca exp-rule-viz exp-weak-features exp-weak-features-beta exp-noisy-label-catboost exp-imbalanced-classification exp-imbalanced-classification-smoke exp-leaf-embedding-umap
+.PHONY: help lint test check track-figures exp-roc-vs-ap exp-roc-vs-ap-imbalance exp-roc-vs-ap-info exp-embedding-pca exp-rule-viz exp-weak-features exp-weak-features-beta exp-noisy-label-catboost exp-imbalanced-classification exp-imbalanced-classification-smoke exp-leaf-embedding-umap
 
 # Run every experiment through `uv run` so it always uses the locked
 # environment from uv.lock. Override with `PYTHON=` if you want to bypass.
 PYTHON ?= uv run python
+
+.DEFAULT_GOAL := help
+
+help:  ## List the targets
+	@grep -E '^[a-zA-Z0-9_-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "}; {printf "  %-38s %s\n", $$1, $$2}'
+
+lint:  ## Lint the library, experiments, notebooks and tests with ruff
+	uv run ruff check .
+
+test:  ## Run the test suite (the slow smoke test needs the catboost and umap extras)
+	uv run --extra catboost --extra umap pytest -q
+
+check: lint test  ## Lint, then test
 
 exp-roc-vs-ap:  ## Run both studies (full experiment)
 	cd experiments/2026-06-06_roc_vs_ap && $(PYTHON) run_experiment.py
