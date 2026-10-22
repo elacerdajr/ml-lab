@@ -1,0 +1,106 @@
+{
+  "config": {
+    "config.yaml": {
+      "data": {
+        "n_repeats": 30,
+        "n_test": 50000,
+        "n_valid": 1000,
+        "seeds": {
+          "test_base": 10000,
+          "train": 101,
+          "valid": 202
+        }
+      },
+      "experiment": {
+        "description": "Compare CatBoost, HistGradientBoosting, and interpretable rule/tree models (FIGS, GreedyRuleList, plain DecisionTree) when the feature set is wide but weak (100 features, each with information 0.10). The sweep varies the training size against a large OOS test set.\n",
+        "name": "weak_features_sample_size"
+      },
+      "gap_baseline": "catboost",
+      "metrics": [
+        "roc_auc",
+        "average_precision",
+        "brier_score"
+      ],
+      "models": {
+        "catboost": {
+          "factory": "make_catboost",
+          "label": "CatBoost",
+          "params": {
+            "depth": 4,
+            "iterations": 400,
+            "learning_rate": 0.05
+          }
+        },
+        "decision_tree": {
+          "factory": "make_decision_tree",
+          "label": "DecisionTree (depth=4)",
+          "params": {
+            "max_depth": 4,
+            "min_samples_leaf": 20
+          }
+        },
+        "figs": {
+          "factory": "make_figs",
+          "label": "FIGS (max_rules=25)",
+          "params": {
+            "max_rules": 25
+          }
+        },
+        "greedy": {
+          "factory": "make_greedy_rule_list",
+          "label": "GreedyRuleList (depth=8)",
+          "params": {
+            "max_depth": 8
+          }
+        },
+        "hgb": {
+          "factory": "make_hgb",
+          "label": "HistGradientBoosting",
+          "params": {
+            "iterations": 400,
+            "learning_rate": 0.05,
+            "max_leaf_nodes": 16
+          }
+        },
+        "logistic": {
+          "factory": "make_logistic",
+          "label": "LogisticRegression"
+        }
+      },
+      "outputs": {
+        "dir": "outputs"
+      },
+      "population": {
+        "info_per_feature": 0.1,
+        "n_features": 100,
+        "p_pos": 0.2,
+        "sigma": 1.0
+      },
+      "reference_setup": "logistic",
+      "sweep": {
+        "trial_name": "n_train",
+        "values": [
+          200,
+          500,
+          1000,
+          2000,
+          5000,
+          10000
+        ]
+      }
+    }
+  },
+  "experiment": "2026-06-18_weak_features_sample_size",
+  "git_revision": "5bed9bea6f281e90cad20f7c4f28c3365f96a20d",
+  "packages": {
+    "catboost": "1.2.10",
+    "imodels": "2.0.4",
+    "numpy": "2.4.6",
+    "pandas": "3.0.3",
+    "scikit-learn": "1.9.0",
+    "umap-learn": "0.5.12"
+  },
+  "profile": "default",
+  "python": "3.12.3",
+  "seed": null
+}
