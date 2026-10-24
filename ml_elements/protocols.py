@@ -1,7 +1,7 @@
 """
 protocols.py
 ------------
-Structural interfaces for the ml_exp building blocks.
+Structural interfaces for the ml_elements building blocks.
 
 All blocks depend only on these protocols — never on each other's concrete
 classes. This means any piece can be swapped without touching anything else.
@@ -11,9 +11,9 @@ Usage
 You never need to inherit from these explicitly. Any class that implements
 the required methods satisfies the protocol (duck typing via typing.Protocol).
 
-    class MyDGP:
+    class MyPopulation:
         def sample(self, n: int, seed: int) -> pd.DataFrame: ...
-        # MyDGP now satisfies DGP — no inheritance needed
+        # MyPopulation now satisfies Population, no inheritance needed
 
 """
 
@@ -26,12 +26,13 @@ import pandas as pd
 
 
 @runtime_checkable
-class DGP(Protocol):
+class Population(Protocol):
     """
-    Data-generating process.
+    What an experiment samples labelled rows from.
 
     Any object that produces a labelled DataFrame from (n, seed) satisfies
-    this protocol — synthetic generators, real-data samplers, or wrappers.
+    this protocol: synthetic generators, resampled real tables, or wrappers.
+    (Formerly ``DGP``, for data-generating process; that name is an alias.)
 
     Methods
     -------
@@ -43,7 +44,7 @@ class DGP(Protocol):
 
     def sample(self, n: int, seed: int) -> pd.DataFrame:
         """
-        Draw n rows from this data-generating process.
+        Draw n rows from this population.
 
         Parameters
         ----------
@@ -60,6 +61,9 @@ class DGP(Protocol):
         ...
 
 
+DGP = Population
+
+
 @runtime_checkable
 class ModelBackend(Protocol):
     """
@@ -67,7 +71,7 @@ class ModelBackend(Protocol):
 
     Any sklearn-compatible estimator satisfies this protocol.
     The ``fit`` / ``predict_proba`` split maps directly onto
-    ``TrialRunner``'s train-then-evaluate loop.
+    ``evaluate``'s train-then-score loop.
 
     Methods
     -------

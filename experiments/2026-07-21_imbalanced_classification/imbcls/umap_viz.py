@@ -83,6 +83,7 @@ def compare_full_vs_undersampled_umap(
     fig.tight_layout()
 
     path = out_dir / f"umap_{name}.png"
+    path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(path, dpi=130, bbox_inches="tight")
     plt.close(fig)
     return path

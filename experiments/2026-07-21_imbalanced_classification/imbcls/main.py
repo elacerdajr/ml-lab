@@ -12,7 +12,10 @@ Usage
 from __future__ import annotations
 
 import argparse
+import os
 from pathlib import Path
+
+from ml_elements.run import Run, record
 
 from .config import load_config
 from .runner import Results, final_report, run
@@ -20,25 +23,27 @@ from .runner import Results, final_report, run
 SCRIPT_DIR = Path(__file__).resolve().parent.parent   # experiments/2026-07-21_imbalanced_classification/
 
 
-def _img(title: str, rel_path: str, caption: str) -> list[str]:
-    """Markdown block: a rendered image (relative to report.md) plus an italic caption.
+def _img(title: str, path: Path, report_dir: Path, caption: str) -> list[str]:
+    """Markdown block: a rendered image (linked relative to report.md) plus an italic caption.
 
-    ``rel_path`` is only embedded if the file exists, so a partial run (e.g. UMAP
+    ``path`` is only embedded if the file exists, so a partial run (e.g. UMAP
     skipped without the extra) still produces a valid report.
     """
-    if not (SCRIPT_DIR / rel_path).exists():
+    if not path.exists():
         return []
+    rel_path = Path(os.path.relpath(path, report_dir)).as_posix()
     return [f"![{title}]({rel_path})", "", f"*{caption}*", ""]
 
 
-def _plots_section(out_dir: Path, model_order: list[str]) -> list[str]:
+def _plots_section(out_dir: Path, report_dir: Path, model_order: list[str]) -> list[str]:
     """Assemble the plots section: paths + rendered images + interpretive captions."""
+    plots = out_dir / "plots"
     lines: list[str] = ["## Plots", ""]
 
     # Core scatter / curve figures.
     lines += ["### AP vs score entropy — the core trade-off", ""]
     lines += _img(
-        "AP vs entropy", "outputs/plots/ap_entropy/ap_vs_entropy.png",
+        "AP vs entropy", plots / "ap_entropy/ap_vs_entropy.png", report_dir,
         "x = normalized score entropy, y = average precision, point size ∝ train time. "
         "Top-right (accurate *and* smooth) is ideal; the dotted line marks the "
         "high-entropy threshold (H ≥ 0.80). Tree models sit left (spiky scores), "
@@ -47,7 +52,7 @@ def _plots_section(out_dir: Path, model_order: list[str]) -> list[str]:
 
     lines += ["### Ranking-noise trade-off — headline plot", ""]
     lines += _img(
-        "AP loss vs entropy gain", "outputs/plots/entropy_tradeoff/ap_loss_vs_entropy_gain.png",
+        "AP loss vs entropy gain", plots / "entropy_tradeoff/ap_loss_vs_entropy_gain.png", report_dir,
         "For the deterministic noise score r = αp + (1-α)u: x = entropy gain "
         "ΔH = H(r) − H(p), y = AP change ΔAP = AP(r) − AP(p). Points near the top-right "
         "buy large smoothness gains for negligible ranking loss; steep drops mean the "
@@ -56,21 +61,21 @@ def _plots_section(out_dir: Path, model_order: list[str]) -> list[str]:
 
     lines += ["### AP vs training time", ""]
     lines += _img(
-        "AP vs time", "outputs/plots/ap_time/ap_vs_time.png",
+        "AP vs time", plots / "ap_time/ap_vs_time.png", report_dir,
         "x = log(1 + train time [s]), y = AP, colour = normalized entropy — find the "
         "cheapest model at a given accuracy.",
     )
 
     lines += ["### Bucket lift by score decile", ""]
     lines += _img(
-        "Bucket lift", "outputs/plots/bucket_lift/bucket_lift.png",
+        "Bucket lift", plots / "bucket_lift/bucket_lift.png", report_dir,
         "Positive rate per score decile (log y) with the true base-rate line. A good "
         "ranker's top decile sits far above the base rate.",
     )
 
     lines += ["### Precision–recall curves", ""]
     lines += _img(
-        "Precision-recall", "outputs/plots/precision_recall/precision_recall.png",
+        "Precision-recall", plots / "precision_recall/precision_recall.png", report_dir,
         "PR curves (test, raw probability) — the right diagnostic under heavy imbalance, "
         "where ROC-AUC looks deceptively high.",
     )
@@ -79,8 +84,8 @@ def _plots_section(out_dir: Path, model_order: list[str]) -> list[str]:
     hist_dir = out_dir / "plots" / "score_histograms"
     hist_blocks: list[str] = []
     for name in model_order:
-        rel = f"outputs/plots/score_histograms/score_hist_{name}.png"
-        hist_blocks += _img(name, rel, f"`{name}` — raw vs shrinkage vs noise score.")
+        path = plots / "score_histograms" / f"score_hist_{name}.png"
+        hist_blocks += _img(name, path, report_dir, f"`{name}` — raw vs shrinkage vs noise score.")
     if hist_blocks:
         lines += [
             "### Score distributions (per model)",
@@ -100,17 +105,17 @@ def _plots_section(out_dir: Path, model_order: list[str]) -> list[str]:
     # UMAP panels.
     umap_blocks: list[str] = []
     umap_blocks += _img(
-        "UMAP raw features", "outputs/plots/umap/umap_raw_features.png",
+        "UMAP raw features", plots / "umap/umap_raw_features.png", report_dir,
         "Raw one-hot + scaled features (euclidean). The model-agnostic view of class "
         "separability before any model — full sample (true base rate) vs undersample.",
     )
     umap_blocks += _img(
-        "UMAP CatBoost leaf", "outputs/plots/umap/umap_catboost_leaf.png",
+        "UMAP CatBoost leaf", plots / "umap/umap_catboost_leaf.png", report_dir,
         "CatBoost leaf-index one-hot (cosine) — the *supervised* tree view. The rare "
         "positive class forms much tighter, more separated structure than in raw space.",
     )
     umap_blocks += _img(
-        "UMAP RFF features", "outputs/plots/umap/umap_rff_features.png",
+        "UMAP RFF features", plots / "umap/umap_rff_features.png", report_dir,
         "Random-Fourier feature space (euclidean) that the RFF+logistic model actually "
         "sees.",
     )
@@ -175,7 +180,7 @@ def _write_report(results: Results, report_text: str, out_dir: Path, path: Path)
         "",
         table,
         "",
-        *_plots_section(out_dir, model_order),
+        *_plots_section(out_dir, path.parent, model_order),
         "See `README.md` for how to interpret each metric and plot.",
         "",
     ]
@@ -190,13 +195,17 @@ def main() -> None:
     args = parser.parse_args()
 
     cfg = load_config(args.config, profile=args.profile, smoke=args.smoke)
-    out_dir = SCRIPT_DIR / "outputs"
-    out_dir.mkdir(parents=True, exist_ok=True)
+    # Non-default profiles (smoke, full_spec) write to outputs_<profile>/ with their
+    # own report, so they never overwrite the tracked record in outputs/ and report.md.
+    experiment = Run(SCRIPT_DIR, profile=cfg.profile, seed=cfg.seed, config=cfg.raw)
+    out_dir = experiment.output_dir
+    report_path = SCRIPT_DIR / "report.md" if experiment.is_record else out_dir / "report.md"
 
     results = run(cfg, out_dir)
     report_text = final_report(results.metrics, results.pi)
 
-    _write_report(results, report_text, out_dir, SCRIPT_DIR / "report.md")
+    _write_report(results, report_text, out_dir, report_path)
+    record(experiment)
 
     print("\n" + "=" * 70)
     print(report_text)

@@ -14,13 +14,10 @@ import importlib.util
 import json
 import math
 import re
-import sys
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Iterable
 
 HERE = Path(__file__).resolve().parent
-REPO_ROOT = HERE.parents[1]
-sys.path.insert(0, str(REPO_ROOT))
 
 INSTALL_HINT = "pip install numpy pandas scikit-learn matplotlib pyyaml sentence-transformers"
 REQUIRED_PACKAGES = ["numpy", "pandas", "sklearn", "matplotlib", "yaml", "sentence_transformers"]
@@ -351,10 +348,10 @@ def make_svg_pca123(path: Path, coordinate_rows: list[dict[str, object]]) -> Non
         min_y -= pad_y
         max_y += pad_y
 
-        def sx(value: float) -> float:
+        def sx(value: float, left=left, min_x=min_x, max_x=max_x) -> float:
             return left + (value - min_x) / (max_x - min_x) * panel_width
 
-        def sy(value: float) -> float:
+        def sy(value: float, min_y=min_y, max_y=max_y) -> float:
             return top + (1.0 - (value - min_y) / (max_y - min_y)) * panel_height
 
         parts.append(f'<rect x="{left}" y="{top}" width="{panel_width}" height="{panel_height}" fill="#fbfbfb" stroke="#333"/>')
@@ -529,3 +526,6 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+    from ml_elements.run import Run, record
+
+    record(Run(HERE))  # run_meta.json: config, seed, git revision, packages

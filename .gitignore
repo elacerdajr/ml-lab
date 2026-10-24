@@ -9,3 +9,16 @@ build/
 # uv
 .venv/
 
+# CatBoost writes training logs to the working directory
+catboost_info/
+
+
+# Experiment runs under a non-default profile (smoke, full_spec, ...): never the record
+experiments/*/outputs_*/
+
+# Experiment record policy (docs/experiments.md): reports, the figures they embed or name,
+# CSV/JSON summaries and run_meta.json are tracked. Model dumps and other figures are not.
+# Figures a report uses stay tracked once added; add new ones with `make track-figures`.
+experiments/*/outputs/**/*.png
+experiments/*/outputs/**/*.svg
+experiments/*/outputs/artifacts/

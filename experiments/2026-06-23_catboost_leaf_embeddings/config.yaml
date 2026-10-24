@@ -1,0 +1,20 @@
+# 2026-06-23_catboost_leaf_embeddings: settings read by run_experiment.py
+
+sigmas: [0.05, 0.1, 0.25, 0.5]
+
+extractor_configs:
+  heavy_reg: {depth: 3, iterations: 100, l2_leaf_reg: 100, random_strength: 10}
+  light_reg: {depth: 4, iterations: 200, l2_leaf_reg: 1, random_strength: 1}
+
+p_pos: 0.1
+
+n_train: 2000
+
+n_test: 2000
+
+seed: 42
+
+# GaussianPopulation arguments besides p_pos: class separation per feature, within-class std
+population:
+  info: {x1: 1.2, x2: 0.8, x3: 0.4, x4: 0.15, x5: 0.05}
+  sigma: 1.0

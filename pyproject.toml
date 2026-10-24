@@ -77,9 +77,15 @@ package = true
 [dependency-groups]
 dev = [
     "ruff>=0.5",
+    "pytest>=8.0",
     "ipykernel>=6.0",
     "ipywidgets>=8.0",
 ]
+
+# ── Tests ───────────────────────────────────────────────────────────────────
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["slow: end-to-end experiment runs (deselect with -m 'not slow')"]
 
 # ── Ruff ────────────────────────────────────────────────────────────────────
 [tool.ruff]
@@ -96,7 +102,10 @@ select = [
 ]
 ignore = [
     "E501",  # line length handled by formatter
+    "B905",  # zip(strict=) — adding strict=True to existing experiment code could change behaviour
 ]
 
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401"]
+# Notebook cells import after setup cells and use compact one-liners.
+"*.ipynb" = ["E402", "E701", "E702"]

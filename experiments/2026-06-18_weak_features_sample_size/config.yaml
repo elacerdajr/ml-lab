@@ -29,11 +29,11 @@ data:
     valid: 202
     test_base: 10000
 
-# ── DGP ───────────────────────────────────────────────────────────────────
+# ── Population ───────────────────────────────────────────────────────────────────
 # 100 features, each with separation 0.10 (weak).
 # Individually uninformative, but the Bayes-optimal linear separator
 # aggregates them into a strong signal.
-dgp:
+population:
   p_pos: 0.20
   sigma: 1.0
   n_features: 100
@@ -41,7 +41,7 @@ dgp:
 
 # ── Models ────────────────────────────────────────────────────────────────
 # Each setup sees the same 100 features; only the model differs.
-# `logistic` is the (near-)Bayes reference: the DGP is linear in the features.
+# `logistic` is the (near-)Bayes reference: the population is linear in the features.
 models:
   logistic:
     label: "LogisticRegression"

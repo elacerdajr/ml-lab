@@ -33,12 +33,10 @@ Examples
 from __future__ import annotations
 
 import json
-import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 import numpy as np
-
 
 # ─── Schema ─────────────────────────────────────────────────────────────────
 
@@ -387,3 +385,24 @@ class RuleExtractor:
             n_train=n,
             positive_rate=pos_rate,
         )
+
+
+def extract_rules(
+    model: Any,
+    X_train: np.ndarray,
+    y_train: np.ndarray,
+    feature_names: list[str],
+    *,
+    model_name: str = "model",
+    max_rules: int = 50,
+) -> RuleSet:
+    """
+    The rules a fitted interpretable model learned, with support and precision.
+
+    Supports sklearn ``DecisionTreeClassifier`` and imodels ``RuleFitClassifier``
+    and ``GreedyRuleListClassifier``. Same as
+    ``RuleExtractor(max_rules).from_model(...)``.
+    """
+    return RuleExtractor(max_rules=max_rules).from_model(
+        model, X_train, y_train, feature_names, model_name=model_name
+    )

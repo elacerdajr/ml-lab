@@ -4,9 +4,9 @@ models.py
 Model factory functions.
 
 Each factory returns a sklearn-compatible object that satisfies the
-``ModelBackend`` protocol (fit / predict_proba). Pass a factory — not an
-instance — wherever ``TrialRunner`` or ``Trial.model_factory`` expects one,
-so a fresh model is created for every trial.
+``ModelBackend`` protocol (fit / predict_proba). Pass a factory, not an
+instance, wherever ``Setup.model``, ``evaluate(model=...)`` or
+``Trial.model_factory`` expects one, so a fresh model is created for every trial.
 
 Functions
 ---------
@@ -14,10 +14,11 @@ make_logistic   Fast linear baseline. Matches the Gaussian log-odds structure.
 make_hgb        Lightweight sklearn histogram gradient booster.
 make_catboost   CatBoost gradient booster (requires ``pip install catboost``).
 make_sklearn    Generic wrapper — pass any sklearn estimator class + kwargs.
+embed_leaves    Per-tree leaf indices of a fitted CatBoost model, as features.
 
 Examples
 --------
->>> runner = TrialRunner(setups=..., model_factory=make_logistic(), ...)
+>>> result = evaluate(trials, setups, metrics, budget, model=make_logistic())
 
 >>> # Per-trial override — catboost on one trial, logistic on all others:
 >>> trial = Trial(..., model_factory=make_catboost(depth=6))
@@ -29,8 +30,10 @@ Examples
 
 from __future__ import annotations
 
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
+import numpy as np
 from sklearn.ensemble import HistGradientBoostingClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.tree import DecisionTreeClassifier
@@ -38,6 +41,36 @@ from sklearn.tree import DecisionTreeClassifier
 from .protocols import ModelBackend
 
 _DEFAULT_RANDOM_STATE = 42
+
+
+class SeededFit:
+    """
+    Wraps an estimator whose ``fit`` draws from NumPy's global random state.
+
+    imodels' FIGS and GreedyRuleList do this, so without a seed two runs of the
+    same experiment give different models even with ``random_state`` set.
+    ``fit`` seeds the global state with ``seed`` and restores it afterwards.
+    Every other attribute (``predict_proba``, ``rules_``, ``complexity_``, …)
+    is the wrapped estimator's.
+    """
+
+    def __init__(self, estimator: Any, seed: int) -> None:
+        self.estimator = estimator
+        self.seed = seed
+
+    def fit(self, X, y, **kwargs) -> SeededFit:
+        state = np.random.get_state()
+        np.random.seed(self.seed)
+        try:
+            self.estimator.fit(X, y, **kwargs)
+        finally:
+            np.random.set_state(state)
+        return self
+
+    def __getattr__(self, name: str) -> Any:
+        if name in ("estimator", "seed"):  # not yet set, e.g. while unpickling
+            raise AttributeError(name)
+        return getattr(self.estimator, name)
 
 
 def make_logistic(
@@ -100,22 +133,32 @@ def make_hgb(
     random_state : int
         Reproducibility seed.
     **kwargs
-        Forwarded to ``HistGradientBoostingClassifier``.
+        Forwarded to ``HistGradientBoostingClassifier``. Early stopping is off
+        unless you pass ``early_stopping=True``; then ``scoring`` sets its
+        criterion (a string, or ``metric.as_scorer()``) and
+        ``validation_fraction`` defaults to 0.1.
 
     Returns
     -------
     Callable[[], ModelBackend]
         Zero-argument factory.
+
+    Examples
+    --------
+    >>> make_hgb(early_stopping=True, scoring="average_precision")
+    >>> make_hgb(early_stopping=True, scoring=(AVG_PRECISION - 0.001 * N_ITER).as_scorer())
     """
+    params = {"validation_fraction": None, "early_stopping": False, **kwargs}
+    if params["early_stopping"] and params["validation_fraction"] is None:
+        params["validation_fraction"] = 0.1
+
     def factory() -> ModelBackend:
         return HistGradientBoostingClassifier(
             max_iter=iterations,
             learning_rate=learning_rate,
             max_leaf_nodes=max_leaf_nodes,
             random_state=random_state,
-            validation_fraction=None,
-            early_stopping=False,
-            **kwargs,
+            **params,
         )
 
     factory.__name__ = "make_hgb"
@@ -237,7 +280,8 @@ def make_figs(
         Upper bound on the total number of rules (leaves across all trees).
         Controls the capacity of the additive tree-sum model.
     random_state : int
-        Reproducibility seed.
+        Reproducibility seed, passed to FIGS and used to seed NumPy's global
+        random state during ``fit`` (see ``SeededFit``).
     **kwargs
         Forwarded to ``FIGSClassifier``.
 
@@ -258,10 +302,9 @@ def make_figs(
                 "make_figs requires imodels. Install with: pip install imodels"
             ) from exc
 
-        return FIGSClassifier(
-            max_rules=max_rules,
-            random_state=random_state,
-            **kwargs,
+        return SeededFit(
+            FIGSClassifier(max_rules=max_rules, random_state=random_state, **kwargs),
+            seed=random_state,
         )
 
     factory.__name__ = "make_figs"
@@ -270,6 +313,7 @@ def make_figs(
 
 def make_greedy_rule_list(
     max_depth: int = 8,
+    random_state: int = _DEFAULT_RANDOM_STATE,
     **kwargs: Any,
 ) -> Callable[[], ModelBackend]:
     """
@@ -284,6 +328,9 @@ def make_greedy_rule_list(
     ----------
     max_depth : int
         Maximum length of the rule list.
+    random_state : int
+        Seeds NumPy's global random state during ``fit`` (see ``SeededFit``);
+        GreedyRuleList has no seed parameter of its own.
     **kwargs
         Forwarded to ``GreedyRuleListClassifier``.
 
@@ -305,10 +352,7 @@ def make_greedy_rule_list(
                 "Install with: pip install imodels"
             ) from exc
 
-        return GreedyRuleListClassifier(
-            max_depth=max_depth,
-            **kwargs,
-        )
+        return SeededFit(GreedyRuleListClassifier(max_depth=max_depth, **kwargs), seed=random_state)
 
     factory.__name__ = "make_greedy_rule_list"
     return factory
@@ -402,3 +446,27 @@ def make_sklearn(
 
     factory.__name__ = f"make_sklearn({cls.__name__})"
     return factory
+
+
+def embed_leaves(model: Any, X: Any, *, dtype=np.float32, one_hot: bool = False):
+    """
+    Per-tree leaf indices of a fitted CatBoost model, as a feature matrix.
+
+    Parameters
+    ----------
+    model : fitted CatBoost model
+        Anything with ``calc_leaf_indexes(X)``.
+    X : array, DataFrame or catboost.Pool
+    dtype : numpy dtype
+        Type of the ``(n, n_trees)`` index matrix.
+    one_hot : bool
+        Return a sparse one-hot encoding of each tree's leaf instead (one block
+        of columns per tree), e.g. for UMAP with ``metric="cosine"``. The
+        encoding is fitted on ``X`` itself.
+    """
+    leaves = model.calc_leaf_indexes(X)
+    if not one_hot:
+        return np.asarray(leaves).astype(dtype)
+    from sklearn.preprocessing import OneHotEncoder
+
+    return OneHotEncoder(handle_unknown="ignore", sparse_output=True).fit_transform(leaves)

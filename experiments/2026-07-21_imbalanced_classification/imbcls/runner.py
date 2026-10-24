@@ -18,12 +18,14 @@ import numpy as np
 import pandas as pd
 from sklearn.base import clone
 
+from ml_elements.scores import score_entropy, smooth_labels
+
 from . import data as datamod
 from . import embeddings as emb
 from . import plots, umap_viz
 from .config import Config
 from .data import FEATURES
-from .metrics import compute_bucket_metrics, compute_score_entropy, eval_row
+from .metrics import compute_bucket_metrics, eval_row
 from .models import (
     build_preprocessor,
     build_registry,
@@ -32,7 +34,7 @@ from .models import (
     make_rff_spec,
     predict_scores,
 )
-from .priors import label_smoothing, make_synthetic_prior_points
+from .priors import make_synthetic_prior_points
 from .scoring import apply_transforms
 
 warnings.filterwarnings("ignore")
@@ -105,7 +107,7 @@ def _fit_tasks(spec, train_under, train_full, pi, cfg):
     for lam in cfg.priors.label_smoothing_lambdas:
         yield (
             "label_smoothing", lam, float("nan"),
-            X_under, label_smoothing(y_under, pi, lam), True,
+            X_under, smooth_labels(y_under, pi, lam), True,
         )
 
     for rho in cfg.priors.synthetic_rhos:
@@ -262,9 +264,12 @@ def run(cfg: Config, out_dir: Path, log=None) -> Results:
     buckets_df = pd.concat(bucket_rows, ignore_index=True)
 
     # 5. Save tables ---------------------------------------------------------
-    metrics_df.to_csv(out_dir / "metrics.csv", index=False)
+    # Timings change on every run, so they live apart from the reproducible scores.
+    timing_cols = ["train_time_seconds", "predict_time_seconds"]
+    metrics_df.drop(columns=timing_cols).to_csv(out_dir / "metrics.csv", index=False)
+    metrics_df[["run_id", *timing_cols]].to_csv(out_dir / "timings.csv", index=False)
     buckets_df.to_csv(out_dir / "bucket_metrics.csv", index=False)
-    log.saved(f"metrics.csv ({len(metrics_df)} rows), bucket_metrics.csv ({len(buckets_df)} rows)")
+    log.saved(f"metrics.csv ({len(metrics_df)} rows), timings.csv, bucket_metrics.csv ({len(buckets_df)} rows)")
 
     # 6. Plots ---------------------------------------------------------------
     log.section("Plots")
@@ -319,7 +324,7 @@ def _make_plots(cfg, metrics_df, buckets_df, kept, val_full, test_full, pi, base
         from ml_elements.metrics import AVG_PRECISION
 
         ap_raw = float(AVG_PRECISION.fn(y_test, tt["raw"][0]))
-        h_raw = compute_score_entropy(tt["raw"][0])[1]
+        h_raw = score_entropy(tt["raw"][0])[1]
         for alpha in cfg.priors.noise_alphas:
             sc = tt[f"noise@{alpha:g}"][0]
             trade.append(
@@ -327,7 +332,7 @@ def _make_plots(cfg, metrics_df, buckets_df, kept, val_full, test_full, pi, base
                     "model_name": name,
                     "alpha": alpha,
                     "ap_delta": float(AVG_PRECISION.fn(y_test, sc)) - ap_raw,
-                    "entropy_gain": compute_score_entropy(sc)[1] - h_raw,
+                    "entropy_gain": score_entropy(sc)[1] - h_raw,
                 }
             )
     plots.plot_entropy_tradeoff(pd.DataFrame(trade), plots_dir / "entropy_tradeoff")
@@ -385,6 +390,8 @@ def _save_artifacts(cfg, pre_emb, kept, art_dir, log):
     except Exception:
         log.warn("joblib not installed — skipping artifact dumps")
         return
+    (art_dir / "fitted_preprocessors").mkdir(parents=True, exist_ok=True)
+    (art_dir / "fitted_models").mkdir(parents=True, exist_ok=True)
     if cfg.output.save_preprocessors:
         joblib.dump(pre_emb, art_dir / "fitted_preprocessors" / "preprocessor.joblib")
     if cfg.output.save_linear_models:

@@ -30,17 +30,15 @@ plot_score_distributions
 
 from __future__ import annotations
 
-from typing import Sequence
+from collections.abc import Sequence
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-import matplotlib.ticker as mticker
 from matplotlib.figure import Figure
 
+from .evaluate import Result, TrialResult
 from .metrics import Metric
-from .runner import TrialResult
-from .study import StudyResult
 
 
 def plot_study(
@@ -262,7 +260,7 @@ def plot_feature_importance(
 
 
 def plot_search_heatmap(
-    result: StudyResult,
+    result: Result,
     param_x: str,
     param_y: str,
     metric_col: str = "mean_improvement",
@@ -277,7 +275,7 @@ def plot_search_heatmap(
 
     Parameters
     ----------
-    result : StudyResult
+    result : Result
         Used to extract trial names/values if ``summary`` is not provided.
     param_x : str
         Column name for the x-axis parameter (in ``summary`` or trial metadata).
@@ -336,7 +334,7 @@ def plot_search_heatmap(
 
 
 def plot_score_distributions(
-    result: StudyResult,
+    result: Result,
     metric_name: str,
     setups: Sequence[str] | None = None,
     figsize: tuple[float, float] = (10, 5),
@@ -349,7 +347,7 @@ def plot_score_distributions(
 
     Parameters
     ----------
-    result : StudyResult
+    result : Result
     metric_name : str
         Name of the metric column to plot.
     setups : list[str] | None
@@ -393,7 +391,7 @@ def plot_score_distributions(
             ].values
             if len(vals) == 0:
                 continue
-            bp = ax.boxplot(
+            ax.boxplot(
                 vals,
                 positions=[ti + offset],
                 widths=width * 0.85,

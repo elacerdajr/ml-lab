@@ -31,22 +31,27 @@ import sys
 from pathlib import Path
 
 import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import scipy.sparse as sp
+import yaml
 from scipy.stats import pearsonr, spearmanr
 from sklearn.linear_model import Ridge
 from sklearn.metrics import average_precision_score, r2_score
 from sklearn.preprocessing import OneHotEncoder
 
+from ml_elements.models import embed_leaves
+from ml_elements.population import GaussianPopulation
+from ml_elements.run import Run, record
+
 SCRIPT_DIR = Path(__file__).parent
+CONFIG = yaml.safe_load((SCRIPT_DIR / "config.yaml").read_text())
 OUT_DIR = SCRIPT_DIR / "outputs"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
-sys.path.insert(0, str(SCRIPT_DIR.parent.parent))
-from ml_elements.dgp import GaussianBinaryDGP
 
 logging.basicConfig(
     level=logging.INFO,
@@ -59,27 +64,20 @@ log = logging.getLogger(__name__)
 # Configuration
 # ---------------------------------------------------------------------------
 
-P_POS = 0.10
-N_TRAIN = 2_000
-N_TEST = 2_000
-SEED = 42
+P_POS = CONFIG["p_pos"]
+N_TRAIN = CONFIG["n_train"]
+N_TEST = CONFIG["n_test"]
+SEED = CONFIG["seed"]
 
-DGP = GaussianBinaryDGP(
-    p_pos=P_POS,
-    info={"x1": 1.2, "x2": 0.8, "x3": 0.4, "x4": 0.15, "x5": 0.05},
-    sigma=1.0,
-)
+population = GaussianPopulation(p_pos=P_POS, **CONFIG["population"])
 
-EXTRACTOR_CONFIGS: dict[str, dict] = {
-    "heavy_reg": dict(depth=3, iterations=100, l2_leaf_reg=100, random_strength=10),
-    "light_reg": dict(depth=4, iterations=200, l2_leaf_reg=1, random_strength=1),
-}
+EXTRACTOR_CONFIGS: dict[str, dict] = CONFIG["extractor_configs"]
 
-LAMBDAS = [0.0, 0.05, 0.10, 0.25]  # 0.0 = no-perturbation control, 0.25 = over-perturbation demo
-EPSILON_TIEBREAK = 1e-6
-LOGIT_CLIP = 1e-6
-STD_FLOOR = 1e-8
-ALPHA_RIDGE = 10.0  # fixed L2 strength — one-hot leaf embedding can have p >> n columns
+LAMBDAS = CONFIG["lambdas"]
+EPSILON_TIEBREAK = CONFIG["epsilon_tiebreak"]
+LOGIT_CLIP = CONFIG["logit_clip"]
+STD_FLOOR = CONFIG["std_floor"]
+ALPHA_RIDGE = CONFIG["alpha_ridge"]
 SPEARMAN_LO, SPEARMAN_HI = 0.95, 0.99
 
 # ---------------------------------------------------------------------------
@@ -103,10 +101,6 @@ def _fit_coarse_model(X: np.ndarray, y: np.ndarray, cfg: dict, seed: int) -> obj
     )
     model.fit(X, y)
     return model
-
-
-def _leaf_embeddings(model: object, X: np.ndarray) -> np.ndarray:
-    return model.calc_leaf_indexes(X).astype(np.int32)  # (n, n_trees)
 
 
 def _onehot_encode(
@@ -407,7 +401,7 @@ def _write_report(rows: list[dict]) -> None:
         "",
         "| Parameter | Value |",
         "|-----------|-------|",
-        "| DGP | GaussianBinaryDGP |",
+        "| population | GaussianPopulation |",
         f"| p_pos | {P_POS} |",
         "| Features | x1 (info=1.2), x2 (0.8), x3 (0.4), x4 (0.15), x5 (0.05) |",
         f"| n_train / n_test | {N_TRAIN:,} / {N_TEST:,} |",
@@ -441,7 +435,7 @@ def _write_report(rows: list[dict]) -> None:
         "",
         "## Key results",
         "",
-        "**Caveat on degeneracy counts**: this DGP (`GaussianBinaryDGP`) draws continuous",
+        "**Caveat on degeneracy counts**: this population (`GaussianPopulation`) draws continuous",
         "Gaussian features, so raw CatBoost probabilities are almost always distinct at",
         "float64 precision even before any perturbation — literal ties only occur when two",
         "rows land in the exact same leaf of every single tree. The `dup p0` columns below are",
@@ -593,8 +587,8 @@ def main() -> None:
         sys.exit(1)
 
     log.info("Generating data — n_train=%d  n_test=%d  p_pos=%.2f", N_TRAIN, N_TEST, P_POS)
-    df_train = DGP.sample(n=N_TRAIN, seed=SEED)
-    df_test = DGP.sample(n=N_TEST, seed=SEED + 1_000)
+    df_train = population.sample(n=N_TRAIN, seed=SEED)
+    df_test = population.sample(n=N_TEST, seed=SEED + 1_000)
 
     y_train = df_train["y"].values
     X_train = df_train.drop(columns="y").values
@@ -614,8 +608,8 @@ def main() -> None:
         p0_test = coarse.predict_proba(X_test)[:, 1]
 
         log.info("  extracting leaf embeddings …")
-        emb_train = _leaf_embeddings(coarse, X_train)
-        emb_test = _leaf_embeddings(coarse, X_test)
+        emb_train = embed_leaves(coarse, X_train, dtype=np.int32)
+        emb_test = embed_leaves(coarse, X_test, dtype=np.int32)
 
         log.info("  one-hot encoding leaf embeddings …")
         E_train, E_test, enc = _onehot_encode(emb_train, emb_test)
@@ -730,3 +724,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+    record(Run(SCRIPT_DIR))  # run_meta.json: config, seed, git revision, packages

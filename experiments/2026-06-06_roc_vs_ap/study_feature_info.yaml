@@ -5,7 +5,7 @@
 # Positive fraction is fixed; the signal strength of both features
 # is scaled together via `info_scale_values`.
 #
-# info_j(scale) = config.dgp.info[j] * scale
+# info_j(scale) = config.population.info[j] * scale
 # x2 is always weaker than x1 (their ratio is preserved from config.yaml).
 
 study:

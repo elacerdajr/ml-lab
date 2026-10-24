@@ -1,0 +1,125 @@
+{
+  "config": {
+    "data": {
+      "cat_1_values": 3,
+      "cat_2_high_risk": 8,
+      "cat_2_values": 100,
+      "n_full": 300000,
+      "noise_sigma": 0.5,
+      "num_2_threshold": 0.5,
+      "positive_rate": 0.001
+    },
+    "models": {
+      "catboost_aggressive": {
+        "depth": 7,
+        "iterations": 800,
+        "l2_leaf_reg": 3,
+        "learning_rate": 0.05
+      },
+      "catboost_conservative": {
+        "depth": 4,
+        "iterations": 300,
+        "l2_leaf_reg": 10,
+        "learning_rate": 0.03
+      },
+      "gaussian_process": {
+        "max_train_n": 2000
+      },
+      "linear_svm": {
+        "max_iter": 2000
+      },
+      "logistic": {
+        "max_iter": 500
+      },
+      "mlp": {
+        "alpha": 0.0001,
+        "hidden_layer_sizes": [
+          64,
+          32
+        ],
+        "learning_rate_init": 0.001,
+        "max_iter": 200,
+        "soft_label_regressor": false
+      },
+      "rbf_svm": {
+        "C": 1.0,
+        "gamma": "scale",
+        "max_train_n": 50000
+      },
+      "rff": {
+        "gammas": [
+          0.1,
+          1.0
+        ],
+        "max_iter": 500,
+        "n_components": [
+          200,
+          500
+        ]
+      }
+    },
+    "output": {
+      "bucket_sizes": [
+        10,
+        20,
+        100
+      ],
+      "save_catboost_models": false,
+      "save_linear_models": true,
+      "save_preprocessors": true
+    },
+    "priors": {
+      "label_smoothing_lambdas": [
+        0.01,
+        0.05,
+        0.1,
+        0.2
+      ],
+      "noise_alphas": [
+        0.9,
+        0.95,
+        0.98,
+        0.99
+      ],
+      "shrinkage_lambdas": [
+        0.01,
+        0.05,
+        0.1,
+        0.2
+      ],
+      "synthetic_num_perturb": 0.1,
+      "synthetic_rhos": [
+        0.05,
+        0.1,
+        0.25,
+        0.5
+      ]
+    },
+    "seed": 42,
+    "splits": {
+      "test_fraction": 0.2,
+      "val_fraction": 0.2
+    },
+    "umap": {
+      "min_dist": 0.1,
+      "n_neighbors": 30,
+      "n_umap": 10000
+    },
+    "undersample": {
+      "positive_rate": 0.1
+    }
+  },
+  "experiment": "2026-07-21_imbalanced_classification",
+  "git_revision": "7156dc50802069c787b43a17fd080b9b9bace540",
+  "packages": {
+    "catboost": "1.2.10",
+    "imodels": "2.0.4",
+    "numpy": "2.4.6",
+    "pandas": "3.0.3",
+    "scikit-learn": "1.9.0",
+    "umap-learn": "0.5.12"
+  },
+  "profile": "default",
+  "python": "3.12.3",
+  "seed": 42
+}

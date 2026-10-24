@@ -1,78 +1,57 @@
 """
-ml_exp
-------
-Composable building blocks for ML experiments.
-
-Quick start
+ml_elements
 -----------
-Import everything in one line:
-
-    from ml_exp import *
-
-Or import specific blocks:
-
-    from ml_exp import (
-        GaussianBinaryDGP, RealDataDGP, ShiftedDGP,
-        make_logistic, make_hgb, make_catboost, make_sklearn,
-        AUC, LOGLOSS, AVG_PRECISION, AVG_PRECISION_SMOOTH, Metric, make_smooth_ap,
-        DataBudget, Trial,
-        TrialRunner, TrialResult,
-        Study, StudyResult,
-        SobolSearch, RandomSearch, ManualSearch,
-        Comparator,
-        plot_study, plot_calibration, plot_feature_importance,
-        plot_search_heatmap, plot_score_distributions,
-    )
+Composable building blocks for ML experiments.
 
 Vocabulary
 ----------
-DataBudget       How much data to use (n_train, n_valid, n_test, seeds, n_repeats)
-Trial            One experimental condition (DGP + condition label + optional overrides)
-TrialResult      Output of one trial: fitted models, train/val data, per-repeat scores
-Study            Runs a list of trials, aggregates results, computes improvements
-StudyResult      Full output of Study.run(): all TrialResults + combined scores DataFrame
-SobolSearch      Generates trials from a Sobol quasi-random parameter grid
-RandomSearch     Generates trials from uniform random sampling
-ManualSearch     Generates trials from an explicit list of parameter dicts
-Comparator       Statistical comparison via BayesianAPComparator
+Population     What a trial samples labelled rows from: ``sample(n, seed)``.
+               GaussianPopulation, ResampledPopulation, ShiftedPopulation.
+Setup          One thing being evaluated: name, features, model, optional score transform.
+Metric         A named score with a direction. Arithmetic on metrics returns a metric.
+Trial          One condition to test: a population plus a budget (DataBudget).
+Result         What ``evaluate`` returns: per-repeat scores, fitted models, failures.
+Run            One execution of an experiment folder under one profile.
+RuleSet        Rules extracted from an interpretable model.
+
+Operators
+---------
+population.sample(n, seed)            -> DataFrame
+sweep(space, population=...)          -> list[Trial]
+evaluate(trials, setups, metrics, budget) -> Result
+compare(result, baseline, challenger, metric) -> DataFrame
+embed_leaves(model, X)                -> leaf-index feature matrix
+extract_rules(model, X, y, features)  -> RuleSet
+record(run, tables)                   -> output folder with run_meta.json
 
 Typical flow
 ------------
-    budget = DataBudget(n_train=2000, n_valid=500, n_test=2000,
-                        seed_train=101, seed_valid=202, seed_test_base=10_000,
-                        n_repeats=20)
+    from ml_elements import *
 
-    setups = {"baseline": ["x1", "x2"], "challenger": ["x1", "x2", "x3"]}
-
-    runner = TrialRunner(setups=setups, model_factory=make_logistic(),
-                         metrics=[AUC, AVG_PRECISION], budget=budget)
-    study  = Study(runner, primary_metric=AUC, n_jobs=1)
-
-    trials = ManualSearch(
+    trials = sweep(
         [{"p_pos": p} for p in [0.02, 0.05, 0.10, 0.25, 0.50]],
-        trial_name="p_pos",
-    ).trials(
-        dgp_fn=lambda p: GaussianBinaryDGP(
-            p_pos=p["p_pos"],
-            info={"x1": 0.85, "x2": 0.55, "x3": 0.15},
-        )
+        population=lambda p: GaussianPopulation(p_pos=p["p_pos"], info={"x1": 0.85, "x2": 0.55, "x3": 0.15}),
+        name="p_pos",
     )
+    setups = [Setup("baseline", ["x1", "x2"]), Setup("challenger", ["x1", "x2", "x3"])]
+    result = evaluate(trials, setups, [AUC, AVG_PRECISION], DataBudget.quick(n=2000, n_repeats=20),
+                      model=make_logistic())
+    table = compare(result, "baseline", "challenger", AVG_PRECISION)
 
-    result  = study.run(trials)
-    improv  = study.improvements(result, baseline="baseline", challenger="challenger")
-    summary = study.summarize(improv)
+    result.trial_results[2].models["challenger"].predict_proba(X_new)[:, 1]
 
-    fig = plot_study(summary, metric=AUC)
-    fig.savefig("study_result.png")
-
-    # Access models after the run:
-    model = result.trial_results[2].models["challenger"]
-    model.predict_proba(X_new)[:, 1]
+Former names
+------------
+GaussianBinaryDGP, RealDataDGP, ShiftedDGP, DGP       -> the Population names
+TrialRunner, Study, StudyResult                       -> evaluate, compare, Result
+SobolSearch, RandomSearch, ManualSearch               -> sweep
+Objective, ModelMetric, make_objective                -> Metric
+RuleExtractor                                         -> extract_rules
+These still work. ``Comparator`` was removed: it depended on a
+``bayesian_ap_comparator`` module that is not in the repository.
 """
 
-from .analysis import Comparator
-from .rules import RuleCondition, Rule, RuleSet, RuleExtractor
-from .rule_viz import rule_matrix_html, save_rule_report
+from .dgp import GaussianBinaryDGP, RealDataDGP, ShiftedDGP
 from .embedding_pca import (
     build_embedding_texts,
     encode_with_sentence_transformer,
@@ -81,27 +60,29 @@ from .embedding_pca import (
     plot_first_three_pcs,
     plot_pca_variance,
 )
-from .rich_logger import RichLogger
-from .dgp import GaussianBinaryDGP, RealDataDGP, ShiftedDGP
-from .objectives import (
+from .evaluate import Result, Setup, TrialResult, compare, evaluate
+from .metrics import (
+    ALL_METRICS,
+    AUC,
+    AVG_PRECISION,
+    AVG_PRECISION_SMOOTH,
+    BRIER,
     COEF_L1,
+    LOGLOSS,
+    MAX_SCORE_GAP,
     N_ITER,
     N_LEAVES,
+    NORMALIZED_SCORE_ENTROPY,
+    SCORE_ENTROPY,
+    TIE_RATE,
+    Metric,
     ModelMetric,
     Objective,
     make_objective,
-)
-from .metrics import (
-    ALL_METRICS,
-    AVG_PRECISION,
-    AVG_PRECISION_SMOOTH,
-    AUC,
-    BRIER,
-    LOGLOSS,
-    Metric,
     make_smooth_ap,
 )
 from .models import (
+    embed_leaves,
     make_catboost,
     make_decision_tree,
     make_figs,
@@ -118,23 +99,79 @@ from .plots import (
     plot_search_heatmap,
     plot_study,
 )
-from .protocols import DGP, MetricFn, ModelBackend
-from .runner import TrialResult, TrialRunner
+from .population import GaussianPopulation, ResampledPopulation, ShiftedPopulation
+from .protocols import DGP, MetricFn, ModelBackend, Population
+from .rich_logger import RichLogger
+from .rule_viz import rule_matrix_html, save_rule_report
+from .rules import Rule, RuleCondition, RuleExtractor, RuleSet, extract_rules
+from .run import Run, record, report_figures
+from .runner import TrialRunner
+from .scores import (
+    calibrate_sigmoid,
+    max_score_gap,
+    noise_rank,
+    positive_scores,
+    row_noise,
+    score_entropy,
+    shrink,
+    smooth_labels,
+    tie_rate,
+    to_weighted_rows,
+)
 from .search import ManualSearch, RandomSearch, SobolSearch
 from .study import Study, StudyResult
+from .sweep import sweep, sweep_points
 from .trial import DataBudget, Trial
 
 __all__ = [
-    # Logger
-    "RichLogger",
-    # Protocols
-    "DGP",
-    "ModelBackend",
-    "MetricFn",
-    # DGPs
-    "GaussianBinaryDGP",
-    "RealDataDGP",
-    "ShiftedDGP",
+    # Nouns
+    "Population",
+    "GaussianPopulation",
+    "ResampledPopulation",
+    "ShiftedPopulation",
+    "Setup",
+    "Metric",
+    "Trial",
+    "DataBudget",
+    "Result",
+    "TrialResult",
+    "Run",
+    "RuleSet",
+    # Operators
+    "sweep",
+    "sweep_points",
+    "evaluate",
+    "compare",
+    "embed_leaves",
+    "extract_rules",
+    "record",
+    "report_figures",
+    # Metrics
+    "AUC",
+    "AVG_PRECISION",
+    "AVG_PRECISION_SMOOTH",
+    "LOGLOSS",
+    "BRIER",
+    "SCORE_ENTROPY",
+    "NORMALIZED_SCORE_ENTROPY",
+    "TIE_RATE",
+    "MAX_SCORE_GAP",
+    "N_ITER",
+    "N_LEAVES",
+    "COEF_L1",
+    "ALL_METRICS",
+    "make_smooth_ap",
+    # Scores
+    "score_entropy",
+    "tie_rate",
+    "max_score_gap",
+    "shrink",
+    "noise_rank",
+    "row_noise",
+    "smooth_labels",
+    "to_weighted_rows",
+    "calibrate_sigmoid",
+    "positive_scores",
     # Model factories
     "make_logistic",
     "make_hgb",
@@ -144,42 +181,12 @@ __all__ = [
     "make_greedy_rule_list",
     "make_rule_fit",
     "make_sklearn",
-    # Objectives
-    "Objective",
-    "ModelMetric",
-    "make_objective",
-    "N_ITER",
-    "N_LEAVES",
-    "COEF_L1",
-    # Metrics
-    "Metric",
-    "AUC",
-    "LOGLOSS",
-    "BRIER",
-    "AVG_PRECISION",
-    "AVG_PRECISION_SMOOTH",
-    "ALL_METRICS",
-    "make_smooth_ap",
-    # Experiment primitives
-    "DataBudget",
-    "Trial",
-    # Runner
-    "TrialRunner",
-    "TrialResult",
-    # Study
-    "Study",
-    "StudyResult",
-    # Search
-    "SobolSearch",
-    "RandomSearch",
-    "ManualSearch",
-    # Analysis
-    "Comparator",
-    # Rule extraction and visualization
-    "RuleCondition",
+    # Protocols
+    "ModelBackend",
+    "MetricFn",
+    # Rules and reports
     "Rule",
-    "RuleSet",
-    "RuleExtractor",
+    "RuleCondition",
     "rule_matrix_html",
     "save_rule_report",
     # Embedding PCA utilities
@@ -189,10 +196,26 @@ __all__ = [
     "load_site_descriptions",
     "plot_first_three_pcs",
     "plot_pca_variance",
-    # Plots
+    # Plots and logging
     "plot_study",
     "plot_calibration",
     "plot_feature_importance",
     "plot_search_heatmap",
     "plot_score_distributions",
+    "RichLogger",
+    # Former names
+    "DGP",
+    "GaussianBinaryDGP",
+    "RealDataDGP",
+    "ShiftedDGP",
+    "TrialRunner",
+    "Study",
+    "StudyResult",
+    "SobolSearch",
+    "RandomSearch",
+    "ManualSearch",
+    "Objective",
+    "ModelMetric",
+    "make_objective",
+    "RuleExtractor",
 ]

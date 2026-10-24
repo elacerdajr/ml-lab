@@ -1,0 +1,15 @@
+# 2026-07-01_noisy_label_catboost: settings read by run_experiment.py
+
+noise_levels: [0.1, 0.2, 0.3, 0.4, 0.5]
+
+feature_info: {x1: 1.5, x2: 1.0, x3: 0.6, x4: 0.3, x5: 0.1}
+
+p_pos: 0.35
+
+n_train: 3000
+
+n_test: 2000
+
+seed: 42
+
+catboost_params: {iterations: 300, depth: 4, learning_rate: 0.06}

@@ -55,6 +55,7 @@ def plot_score_histograms(
     fig.suptitle(f"Score distributions — {model_name}", fontsize=12)
     fig.tight_layout()
     path = out_dir / f"score_hist_{model_name}.png"
+    path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(path, dpi=130, bbox_inches="tight")
     plt.close(fig)
     return path
@@ -76,6 +77,7 @@ def plot_precision_recall(entries: list[tuple[str, np.ndarray, np.ndarray]], out
     _despine(ax)
     fig.tight_layout()
     path = out_dir / "precision_recall.png"
+    path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(path, dpi=130, bbox_inches="tight")
     plt.close(fig)
     return path
@@ -100,6 +102,7 @@ def plot_ap_entropy(df: pd.DataFrame, out_dir: Path) -> Path:
     _despine(ax)
     fig.tight_layout()
     path = out_dir / "ap_vs_entropy.png"
+    path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(path, dpi=130, bbox_inches="tight")
     plt.close(fig)
     return path
@@ -123,6 +126,7 @@ def plot_ap_time(df: pd.DataFrame, out_dir: Path) -> Path:
     _despine(ax)
     fig.tight_layout()
     path = out_dir / "ap_vs_time.png"
+    path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(path, dpi=130, bbox_inches="tight")
     plt.close(fig)
     return path
@@ -152,6 +156,7 @@ def plot_entropy_tradeoff(df: pd.DataFrame, out_dir: Path) -> Path:
     _despine(ax)
     fig.tight_layout()
     path = out_dir / "ap_loss_vs_entropy_gain.png"
+    path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(path, dpi=130, bbox_inches="tight")
     plt.close(fig)
     return path
@@ -178,6 +183,7 @@ def plot_bucket_lift(bucket_df: pd.DataFrame, base_rate: float, out_dir: Path) -
     _despine(ax)
     fig.tight_layout()
     path = out_dir / "bucket_lift.png"
+    path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(path, dpi=130, bbox_inches="tight")
     plt.close(fig)
     return path
